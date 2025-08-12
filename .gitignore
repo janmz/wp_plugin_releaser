@@ -6,6 +6,7 @@
 *.dll
 *.so
 *.dylib
+*.code-workplace
 
 # Test binaries
 *.test
