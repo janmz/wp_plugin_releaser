@@ -49,8 +49,8 @@ wp_plugin_release /pfad/zum/plugin
   "ssh_dir_base": "/var/www/html/updates",
   "ssh_user": "username",
   "ssh_key_file": "/pfad/zu/key.pem",
-  "ssh_password": "",
-  "ssh_secure_password": ""
+  "ssh_password": "password in plain text",
+  "ssh_secure_password": "will contain encrypted password after first run and ssh_password will contain only a notice"
 }
 ```
 
