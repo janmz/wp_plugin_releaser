@@ -1,9 +1,9 @@
 # wp_plugin_release
 
-![Go Version](https://img.shields.io/github/go-mod/go-version/USERNAME/wp_plugin_release)
-![Release](https://img.shields.io/github/v/release/USERNAME/wp_plugin_release)
+![Go Version](https://img.shields.io/github/go-mod/go-version/janmz/wp_plugin_release)
+![Release](https://img.shields.io/github/v/release/janmz/wp_plugin_release)
 ![License: MIT (modified)](https://img.shields.io/badge/License-MIT--Modified-blue.svg)
-[![Support: CFI-Kinderhilfe](https://img.shields.io/badge/Support-CFI--Kinderhilfe-0077B6?logo=heart)](https://cfi-kinderhilfe.de)
+[![Support: CFI-Kinderhilfe](https://img.shields.io/badge/Support-CFI--Kinderhilfe-0077B6?logo=heart)](https://cfi-kinderhilfe.de/jetzt-spenden?q=VAYAWPR)
 
 Ein leichtgewichtiges Go-Tool, um **neue Releases für WordPress-Plugins** automatisiert bereitzustellen – inklusive:
 
@@ -19,14 +19,15 @@ Ein leichtgewichtiges Go-Tool, um **neue Releases für WordPress-Plugins** autom
 - **ZIP-Erstellung** mit Skip-Patterns
 - **SSH-Upload** (Key- oder Passwort-basiert)
 - **Logdatei** mit allen Schritten
+- **Plugin-update-checker** von YahnisElsts wird verwendet (https://github.com/YahnisElsts/plugin-update-checker) sp lömmem Plugin-Updates einfach über den eigenen Webserver verteilt werden..
 
 ## Installation
 
 ```bash
-go install github.com/USERNAME/wp_plugin_release@latest
+go install github.com/janmz/wp_plugin_release@latest
 ```
 
-Oder Release-Binaries herunterladen: [Releases](https://github.com/USERNAME/wp_plugin_release/releases)
+Oder Release-Binaries herunterladen: [Releases](https://github.com/janmz/wp_plugin_release/releases)
 
 ## Verwendung
 
@@ -62,13 +63,13 @@ wp_plugin_release /pfad/zum/plugin
 
 Diese Software steht unter einer modifizierten MIT-Lizenz (siehe `LICENSE`).
 Du darfst den Code frei verwenden, anpassen und weitergeben, **solange** du den ursprünglichen Autor
-**Jan Neuhaus** nennst und einen Link auf das Original-Repository beibehältst: `https://github.com/USERNAME/wp_plugin_release`.
+**Jan Neuhaus** nennst und einen Link auf das Original-Repository beibehältst: `https://github.com/janmz/wp_plugin_release`.
 
 Es wird **keinerlei Gewährleistung** übernommen.
 
 ## Spenden
 
-Wenn Ihnen das Projekt gefällt, unterstützten Sie bitte die **CFI-Kinderhilfe**: https://cfi-kinderhilfe.de
+Wenn Ihnen das Projekt gefällt, unterstützten Sie bitte die **CFI-Kinderhilfe**: https://cfi-kinderhilfe.de/jetzt-spenden?q=VAYAWPR
 (Spenden gehen an die CFI-Kinderhilfe, nicht an den Autor.)
 
 ## Contributing
@@ -77,4 +78,4 @@ Beiträge sind willkommen! Bitte schaue dir `CONTRIBUTING.md` an, bevor du einen
 
 ## Kontakt
 
-Author: Jan Neuhaus — VAYA Consulting
+Author: Jan Neuhaus — VAYA Consulting / https://vaya-consulting.de/development?q=GITHUB
