@@ -1,0 +1,29 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goos: [linux, windows, darwin]
+        goarch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+      - run: go mod tidy
+      - run: |
+          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
+          go build -o dist/wp_plugin_release-${{ matrix.goos }}-${{ matrix.goarch }}
+      - name: Create release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/wp_plugin_release-*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
