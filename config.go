@@ -1,5 +1,20 @@
 package main
 
+/*
+ * Dieses Modul enthält eine Funktion zum Management von Config-Dateien mit sicheren Passwörtern.
+ *
+ * Version 1.0
+ *
+ * Autor: Jan Neuhaus, VAYA Consulting, https://vaya-consultig.de/development/ https://github.com/janmz
+ *
+ * Funktionen:
+ * - loadConfig(): Lädt die Konfiguration aus einer Datei und verarbeitet sie.
+ *
+ * Abhänigkeiten:
+ * - hardware-id.go: Damit Passwörter nicht auf anderen Systemen entschlüsselt werden können, wird mit dieser Datei ein systemabhängiger Schlüssel erzeugt.
+ *
+ */
+
 import (
 	"crypto/rand"
 	"encoding/json"
@@ -23,6 +38,78 @@ const PASSWORD_IS_SECURE = "Hier neues Passwort eintragen"
 
 var encryptionKey []byte
 var initialized = false
+
+/*
+ * Reading a JSON file containing data for the config struct, where
+ * passwords are encrypted and decrypted, and if the cleanConfig parameter
+ * is set, a file with unencrypted passwords is written.
+ * @param config	Ist eine Struktur, die die einzulesende Config-Datei aufnehmen wird
+ * @param version	Wenn in der Struktur eine Variable Version vorhanden ist, wird diese aktuell gehalten
+ * @param path		Pfad unter dem die config-Datei gespeichert ist
+ * @param cleanConfig	Für den Fall, dass man die Passwörter doch nochmal im Klartext braucht, kann damit erzwungen werden, die Datei mit Klartextpasswörtern zu schreiben.
+ * @return error	Fehlermeldung, wenn die Config-Datei nicht gelesen werden konnte
+ */
+func loadConfig(config interface{}, version int, path string, cleanConfig bool) error {
+
+	var file []byte
+
+	config_init()
+
+	_, err := os.Stat(path)
+	if !os.IsNotExist(err) {
+		file, err = os.ReadFile(path)
+		if err != nil {
+			//lint:ignore ST1005 German error message requires capitalization
+			return fmt.Errorf("Failed to read config file: %v", err)
+		}
+	} else {
+		file = make([]byte, 0)
+	}
+
+	// Analyze config type
+	configValue := reflect.ValueOf(config)
+	if configValue.Kind() == reflect.Ptr {
+		configValue = configValue.Elem()
+	}
+	if configValue.Kind() != reflect.Struct {
+		return fmt.Errorf("config must be a pointer to a struct")
+	}
+
+	if err := updateDefaultValues(configValue); err != nil {
+		return fmt.Errorf("failed to set default config entries: %v", err)
+	}
+
+	if err := json.Unmarshal(file, config); err != nil {
+		return fmt.Errorf("failed to parse config file: %v", err)
+	}
+	changed := false
+	if err := updateVersionAndPasswords(configValue, version, &changed); err != nil {
+		return fmt.Errorf("failed to check config entries: %v", err)
+	}
+	if cleanConfig {
+		/* Decrypt passwords before writing */
+		if err := decodePasswords(configValue); err != nil {
+			return fmt.Errorf("failed to decode passwords in config entries: %v", err)
+		}
+		changed = true
+	}
+	if changed {
+		configJSON, err := json.MarshalIndent(config, "", "\t")
+		if err != nil {
+			return fmt.Errorf("failed to marshal config to JSON: %v", err)
+		}
+		if err := os.WriteFile(path, configJSON, 0644); err != nil {
+			return fmt.Errorf("failed to write config to file %s: %v", path, err)
+		}
+	}
+	if !cleanConfig {
+		/* Decrypt passwords after writing */
+		if err := decodePasswords(configValue); err != nil {
+			return fmt.Errorf("failed to decode passwords in config entries: %v", err)
+		}
+	}
+	return nil
+}
 
 /*
  * Password key initialization
@@ -55,7 +142,7 @@ func config_init() {
  * Go through the structure and set the default values present
  * in the annotations
  */
-func process_defaults(v reflect.Value) error {
+func updateDefaultValues(v reflect.Value) error {
 	if v.Kind() == reflect.Ptr {
 		v = v.Elem()
 	}
@@ -68,14 +155,14 @@ func process_defaults(v reflect.Value) error {
 		field := t.Field(i)
 		fieldValue := v.Field(i)
 		if field.Type.Kind() == reflect.Struct {
-			if err := process_defaults(fieldValue); err != nil {
+			if err := updateDefaultValues(fieldValue); err != nil {
 				//lint:ignore ST1005 German error message requires capitalization
 				return fmt.Errorf("Fehler beim Auslesen der default-Version der config-Datei: %v", err)
 			}
 		} else if field.Type.Kind() == reflect.Slice {
 			for i := 0; i < fieldValue.Len(); i++ {
 				if fieldValue.Index(i).Kind() == reflect.Struct {
-					if err := process_defaults(fieldValue.Index(i)); err != nil {
+					if err := updateDefaultValues(fieldValue.Index(i)); err != nil {
 						return err
 					}
 				}
@@ -114,7 +201,7 @@ func process_defaults(v reflect.Value) error {
  * Check new content and update encrypted passwords and version as needed
  * If changes are made, the modified file will be written back at the end
  */
-func process_checks(v reflect.Value, version int, changed *bool) error {
+func updateVersionAndPasswords(v reflect.Value, version int, changed *bool) error {
 	if v.Kind() == reflect.Ptr {
 		//fmt.Printf("Pointer\n")
 		v = v.Elem()
@@ -134,7 +221,7 @@ func process_checks(v reflect.Value, version int, changed *bool) error {
 
 		// Process nested structures recursively
 		if field.Type.Kind() == reflect.Struct {
-			if err := process_checks(fieldValue, version, changed); err != nil {
+			if err := updateVersionAndPasswords(fieldValue, version, changed); err != nil {
 				return err
 			}
 		} else if field.Type.Kind() == reflect.Slice {
@@ -142,7 +229,7 @@ func process_checks(v reflect.Value, version int, changed *bool) error {
 			for i := 0; i < fieldValue.Len(); i++ {
 				//fmt.Printf("Slice-Element %d:\n", i)
 				if fieldValue.Index(i).Kind() == reflect.Struct {
-					if err := process_checks(fieldValue.Index(i), version, changed); err != nil {
+					if err := updateVersionAndPasswords(fieldValue.Index(i), version, changed); err != nil {
 						return err
 					}
 				} else {
@@ -185,7 +272,7 @@ func process_checks(v reflect.Value, version int, changed *bool) error {
 /*
  * Decrypt the encrypted passwords so that the encryption is transparent in the main program.
  */
-func process_decode(v reflect.Value) error {
+func decodePasswords(v reflect.Value) error {
 	if v.Kind() == reflect.Ptr {
 		v = v.Elem()
 	}
@@ -200,13 +287,13 @@ func process_decode(v reflect.Value) error {
 
 		// Process recursively nested structures
 		if field.Type.Kind() == reflect.Struct {
-			if err := process_decode(fieldValue); err != nil {
+			if err := decodePasswords(fieldValue); err != nil {
 				return err
 			}
 		} else if field.Type.Kind() == reflect.Slice {
 			for i := 0; i < fieldValue.Len(); i++ {
 				if fieldValue.Index(i).Kind() == reflect.Struct {
-					if err := process_decode(fieldValue.Index(i)); err != nil {
+					if err := decodePasswords(fieldValue.Index(i)); err != nil {
 						return err
 					}
 				}
@@ -228,73 +315,6 @@ func process_decode(v reflect.Value) error {
 					}
 				}
 			}
-		}
-	}
-	return nil
-}
-
-/*
- * Reading a JSON file containing data for the config struct, where
- * passwords are encrypted and decrypted, and if the cleanConfig parameter
- * is set, a file with unencrypted passwords is written.
- */
-func loadConfig(config interface{}, version int, path string, cleanConfig bool) error {
-
-	var file []byte
-
-	config_init()
-
-	_, err := os.Stat(path)
-	if !os.IsNotExist(err) {
-		file, err = os.ReadFile(path)
-		if err != nil {
-			//lint:ignore ST1005 German error message requires capitalization
-			return fmt.Errorf("Failed to read config file: %v", err)
-		}
-	} else {
-		file = make([]byte, 0)
-	}
-
-	// Analyze config type
-	configValue := reflect.ValueOf(config)
-	if configValue.Kind() == reflect.Ptr {
-		configValue = configValue.Elem()
-	}
-	if configValue.Kind() != reflect.Struct {
-		return fmt.Errorf("config must be a pointer to a struct")
-	}
-
-	if err := process_defaults(configValue); err != nil {
-		return fmt.Errorf("failed to set default config entries: %v", err)
-	}
-
-	if err := json.Unmarshal(file, config); err != nil {
-		return fmt.Errorf("failed to parse config file: %v", err)
-	}
-	changed := false
-	if err := process_checks(configValue, version, &changed); err != nil {
-		return fmt.Errorf("failed to check config entries: %v", err)
-	}
-	if cleanConfig {
-		/* Decrypt passwords before writing */
-		if err := process_decode(configValue); err != nil {
-			return fmt.Errorf("failed to decode passwords in config entries: %v", err)
-		}
-		changed = true
-	}
-	if changed {
-		configJSON, err := json.MarshalIndent(config, "", "\t")
-		if err != nil {
-			return fmt.Errorf("failed to marshal config to JSON: %v", err)
-		}
-		if err := os.WriteFile(path, configJSON, 0644); err != nil {
-			return fmt.Errorf("failed to write config to file %s: %v", path, err)
-		}
-	}
-	if !cleanConfig {
-		/* Decrypt passwords after writing */
-		if err := process_decode(configValue); err != nil {
-			return fmt.Errorf("failed to decode passwords in config entries: %v", err)
 		}
 	}
 	return nil

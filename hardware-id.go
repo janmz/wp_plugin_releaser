@@ -1,5 +1,19 @@
 package main
 
+/*
+ * Die Datei definiert eine Funktion mit der ein 64Bit-Zahl erzeugt wird, die ein System
+ * so eindeutig identifiziert, dass es unwahrscheinlich ist, dass jemand einfach ein zweites Systeme
+ * bauen kann, das die identitische ID bekommt. Damit können Systemspezifische Schlüssel erzeugt werden,
+ * die z.B. für die Verschlüsselung von Passwörtern in Config-Dateien verwendet werden.
+ *
+ * Version 1.0
+ *
+ * Autor: Jan Neuhaus, VAYA Consulting, https://vaya-consultig.de/development/ https://github.com/janmz
+ *
+ * Funktionen:
+ * getHardwareID(): Liefert eine 64 Bit Identifikation des aktuellen Systems oder einen Fehler
+ */
+
 import (
 	"crypto/sha256"
 	"fmt"
@@ -9,7 +23,6 @@ import (
 	"strings"
 )
 
-// getHardwareID generates a unique ID based on hardware properties
 func getHardwareID() (uint64, error) {
 	var identifiers []string
 

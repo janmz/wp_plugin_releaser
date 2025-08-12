@@ -8,10 +8,21 @@ package main
  * ZIP-Datei erstellt und unter Updates bereitgestellt und die beiden Dateien dann auf dem
  * Webserver abgelegt.
  *
- * (c)2025 Jan Neuhaus, VAYA Consulting
+ * Abhängigkeiten:
+ * config.go: Einlesen der Config-Datei mit sicheren Passwörtern
+ * hardware-id.go: Bestimmung einer eindeutigen System-ID für die Schlüssel von config.go
+ *
+ * Version: In Datei version.go!
+ *
+ * Autor: Jan Neuhaus, VAYA Consulting, https://vaya-consultig.de/development/ https://github.com/janmz
+ *
+ * Repository: Https://github.com/janmz/wp_plugin_releaser
  *
  * Change_log:
- * 8.8.2025	Erste Version erstellt und getestet
+ * 12.8.2025	Über github bereitgestellt
+ * 8.8.2025		Erste Version erstellt und getestet
+ *
+ * (c)2025 Jan Neuhaus, VAYA Consulting
  *
  */
 
@@ -109,7 +120,7 @@ func main() {
 	initLogging(workDir)
 	defer logFile.Close()
 
-	logAndPrint("WordPress Plugin Release Tool gestartet")
+	logAndPrint("WordPress Plugin Release Tool Version " + Version + " vom " + BuildTime + " gestartet")
 	logAndPrint(fmt.Sprintf("Arbeitsverzeichnis: %s", workDir))
 
 	// Read config file
@@ -375,6 +386,15 @@ func marshalWithoutHTMLescaping(data interface{}) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+// Liest die Datei update_info.json ein und gibt die enthaltenen Informationen zurück.
+// Dabei werden Informationen, die nicht in der bekannten Definition von UpdateInfo
+// enthalten sind in einer map zwischengespeichert.
+//
+// Diese Funktion prüft auch, ob die Datei existiert und ob das JSON-Format korrekt ist.
+//
+// @param updateInfoPath Pfad zur update_info.json-Datei
+// @return *UpdateInfo, map[string]interface{}, error
+// @see UpdateInfo
 func getUpdateInfo(updateInfoPath string) (*UpdateInfo, map[string]interface{}, error) {
 	logAndPrint(fmt.Sprintf("Einlesen Update-Info: %s", updateInfoPath))
 
@@ -671,12 +691,12 @@ func parseRemotePath(downloadURL string, basedir string) (string, error) {
 		path = "/" + path
 	}
 	if strings.HasSuffix(path, "/") {
-		//lint:ignore ST1005
+		//lint:ignore ST1005 German error message requires capitalization
 		return "", fmt.Errorf("%s endet in einem Verzeichnis!", downloadURL)
 	}
 	pos := strings.LastIndex(path, "/")
 	if pos <= 0 {
-		//lint:ignore ST1005
+		//lint:ignore ST1005 German error message requires capitalization
 		return "", fmt.Errorf("%s enthält keinen Dateinamen!", downloadURL)
 	} else {
 		path = path[:pos]
