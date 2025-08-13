@@ -155,22 +155,24 @@ func main() {
 	}
 	remoteZIPName := filepath.Base(updateInfo.DownloadURL)
 	re := regexp.MustCompile(`-v?[0-9.]*\.zip$`)
-	remoteZIPName = re.ReplaceAllString(remoteZIPName, "")
+	remoteZIPName2 := re.ReplaceAllString(remoteZIPName, "")
 	if updateInfo.Slug == "" {
-		updateInfo.Slug = remoteZIPName
+		updateInfo.Slug = remoteZIPName2
 	}
-	if re.MatchString(remoteZIPName) {
+	if re.MatchString(remoteZIPName2) {
 		logAndPrint("Fehler: Konnte Versionummer im Namen der ZIP-Datei nicht entfernen")
-		remoteZIPName = strings.TrimSuffix(remoteZIPName, ".zip")
+		remoteZIPName2 = strings.TrimSuffix(remoteZIPName2, ".zip")
 	}
 	// Create ZIP file
-	zipFileName := fmt.Sprintf("%s-v%s.zip", remoteZIPName, currentVersion)
+	zipFileName := fmt.Sprintf("%s-v%s.zip", remoteZIPName2, currentVersion)
 	zipPath := filepath.Join(workDir, "Updates", zipFileName)
 	err = createZipFile(workDir, zipPath, config.SkipPattern, updateInfo.Slug)
 	if err != nil {
 		logAndPrint(fmt.Sprintf("Fehler beim Erstellen der ZIP-Datei: %v", err))
 		os.Exit(1)
 	}
+	updateInfo.DownloadURL = strings.TrimSuffix(updateInfo.DownloadURL, remoteZIPName) + zipFileName
+	logAndPrint(fmt.Sprintf("Download URL auf '%s' gesetzt!", updateInfo.DownloadURL))
 
 	err = setUpdateInfo(updateInfo, allData, updateInfoPath)
 	if err != nil {
@@ -258,7 +260,7 @@ func processMainPHPFile(workDir, mainPHPFile string, updateInfo *UpdateInfo) (st
 	}
 
 	if classVersion != "" && classVersion != currentVersion {
-		contentStr = classVersionRegex.ReplaceAllString(contentStr, fmt.Sprintf("private $version = '%s'", currentVersion))
+		contentStr = classVersionRegex.ReplaceAllString(contentStr, fmt.Sprintf("private $$version = '%s'", currentVersion))
 		logAndPrint(fmt.Sprintf("Klassen-Property Version aktualisiert auf: %s", currentVersion))
 	}
 
