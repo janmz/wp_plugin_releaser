@@ -1,4 +1,4 @@
-module vaya-consulting.de/wp_plugin_release
+module github.com/janmz/wp_plugin_release
 
 go 1.23.0
 

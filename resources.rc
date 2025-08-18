@@ -1,8 +1,8 @@
 IDI_ICON1 ICON "vaya.ico"
 
 1 VERSIONINFO
-FILEVERSION     1,0,0,15
-PRODUCTVERSION  1,0,0,15
+FILEVERSION     1,0,0,17
+PRODUCTVERSION  1,0,0,17
 BEGIN
   BLOCK "StringFileInfo"
   BEGIN
@@ -10,12 +10,12 @@ BEGIN
     BEGIN
       VALUE "CompanyName", "VAYA Consulting"
       VALUE "FileDescription", "Ein Werkzeug, um Updates für Plugins auf einem eigenen Server zu aktualisieren."
-      VALUE "FileVersion", "1.0.0.15"
+      VALUE "FileVersion", "1.0.0.17"
       VALUE "InternalName", "wp_plugin_release"
       VALUE "LegalCopyright", "Copyright (c)2025 VAYA Consulting"
       VALUE "OriginalFilename", "wp_plugin_release.exe"
       VALUE "ProductName", "wp_plugin_release"
-      VALUE "ProductVersion", "1.0.0.15"
+      VALUE "ProductVersion", "1.0.0.17"
     END
   END
   BLOCK "VarFileInfo"

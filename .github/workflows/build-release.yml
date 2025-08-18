@@ -1,0 +1,272 @@
+# GitHub Actions Workflow für wp_plugin_release mit i18n Support
+name: Build and Release
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main ]
+
+env:
+  GO_VERSION: '1.21'
+
+jobs:
+  # Tests und Code-Qualität
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+    
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+    
+    - name: Download dependencies
+      run: go mod download
+    
+    - name: Run tests
+      run: go test -v -race -coverprofile=coverage.out ./...
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.out
+        flags: unittests
+        name: codecov-umbrella
+    
+    - name: Run golangci-lint
+      uses: golangci/golangci-lint-action@v3
+      with:
+        version: latest
+
+  # i18n Validation
+  i18n-validate:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+    
+    - name: Validate translations
+      run: |
+        # Überprüfen ob alle Übersetzungsdateien vorhanden sind
+        if [ ! -f "locales/en.json" ]; then
+          echo "Error: locales/en.json missing"
+          exit 1
+        fi
+        if [ ! -f "locales/de.json" ]; then
+          echo "Error: locales/de.json missing"
+          exit 1
+        fi
+        
+        # JSON-Syntax validieren
+        python3 -m json.tool locales/en.json > /dev/null
+        python3 -m json.tool locales/de.json > /dev/null
+        
+        echo "i18n validation passed"
+
+  # Build für alle Plattformen
+  build:
+    needs: [test, i18n-validate]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goos: [linux, windows, darwin]
+        goarch: [amd64, arm64]
+        exclude:
+          # Windows ARM64 noch nicht gut unterstützt
+          - goos: windows
+            goarch: arm64
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+    
+    - name: Get version
+      id: version
+      run: |
+        if [[ $GITHUB_REF == refs/tags/* ]]; then
+          VERSION=${GITHUB_REF#refs/tags/}
+        else
+          VERSION=$(git describe --tags --always --dirty)
+        fi
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "build_time=$(date '+%Y-%m-%d %H:%M:%S')" >> $GITHUB_OUTPUT
+        echo "git_commit=$GITHUB_SHA" >> $GITHUB_OUTPUT
+    
+    - name: Build binary
+      env:
+        GOOS: ${{ matrix.goos }}
+        GOARCH: ${{ matrix.goarch }}
+        CGO_ENABLED: 0
+      run: |
+        BINARY_NAME="wp_plugin_release"
+        if [ "$GOOS" = "windows" ]; then
+          BINARY_NAME="${BINARY_NAME}.exe"
+        fi
+        
+        go build \
+          -ldflags "-s -w -X main.Version=${{ steps.version.outputs.version }} -X 'main.BuildTime=${{ steps.version.outputs.build_time }}' -X main.GitCommit=${{ steps.version.outputs.git_commit }}" \
+          -o "bin/${BINARY_NAME}" \
+          .
+    
+    - name: Create release package
+      run: |
+        BINARY_NAME="wp_plugin_release"
+        if [ "${{ matrix.goos }}" = "windows" ]; then
+          BINARY_NAME="${BINARY_NAME}.exe"
+        fi
+        
+        PACKAGE_NAME="wp_plugin_release-${{ steps.version.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}"
+        
+        # Paket-Verzeichnis erstellen
+        mkdir -p "dist/$PACKAGE_NAME"
+        
+        # Binary kopieren
+        cp "bin/$BINARY_NAME" "dist/$PACKAGE_NAME/"
+        
+        # Dokumentation und Übersetzungen kopieren
+        cp README.md "dist/$PACKAGE_NAME/"
+        cp LICENSE "dist/$PACKAGE_NAME/"
+        cp SECURITY.md "dist/$PACKAGE_NAME/"
+        cp -r locales "dist/$PACKAGE_NAME/"
+        
+        # Archive erstellen
+        cd dist
+        if [ "${{ matrix.goos }}" = "windows" ]; then
+          zip -r "$PACKAGE_NAME.zip" "$PACKAGE_NAME"
+          echo "ASSET_PATH=dist/$PACKAGE_NAME.zip" >> $GITHUB_ENV
+          echo "ASSET_NAME=$PACKAGE_NAME.zip" >> $GITHUB_ENV
+        else
+          tar -czf "$PACKAGE_NAME.tar.gz" "$PACKAGE_NAME"
+          echo "ASSET_PATH=dist/$PACKAGE_NAME.tar.gz" >> $GITHUB_ENV
+          echo "ASSET_NAME=$PACKAGE_NAME.tar.gz" >> $GITHUB_ENV
+        fi
+    
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: wp_plugin_release-${{ matrix.goos }}-${{ matrix.goarch }}
+        path: ${{ env.ASSET_PATH }}
+
+  # Release erstellen (nur bei Tags)
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Download all artifacts
+      uses: actions/download-artifact@v3
+      with:
+        path: artifacts
+    
+    - name: Create release
+      uses: softprops/action-gh-release@v1
+      with:
+        draft: false
+        prerelease: ${{ contains(github.ref, '-') }}
+        generate_release_notes: true
+        files: artifacts/*/*
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Docker Image (optional)
+  docker:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+    
+    - name: Login to GitHub Container Registry
+      uses: docker/login-action@v2
+      with:
+        registry: ghcr.io
+        username: ${{ github.repository_owner }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v4
+      with:
+        images: ghcr.io/${{ github.repository }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+    
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v4
+      with:
+        context: .
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        build-args: |
+          VERSION=${{ github.ref_name }}
+          BUILD_TIME=${{ github.event.head_commit.timestamp }}
+          GIT_COMMIT=${{ github.sha }}
+
+  # Sicherheits-Scan
+  security:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Run Gosec Security Scanner
+      uses: securecodewarrior/github-action-gosec@master
+      with:
+        args: './...'
+
+  # Deployment (nur für bestimmte Branches/Tags)
+  deploy-staging:
+    if: github.ref == 'refs/heads/develop'
+    needs: [test, i18n-validate, build]
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+    - name: Deploy to staging
+      run: |
+        echo "Deploying to staging environment..."
+        # Hier würde der tatsächliche Deployment-Code stehen
+
+  deploy-production:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [test, i18n-validate, build]
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+    - name: Deploy to production
+      run: |
+        echo "Deploying to production environment..."
+        # Hier würde der tatsächliche Deployment-Code stehen

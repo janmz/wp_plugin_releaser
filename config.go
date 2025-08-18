@@ -10,9 +10,9 @@ package main
  * Funktionen:
  * - loadConfig(): Lädt die Konfiguration aus einer Datei und verarbeitet sie.
  *
- * Abhänigkeiten:
+ * Abhängigkeiten:
  * - hardware-id.go: Damit Passwörter nicht auf anderen Systemen entschlüsselt werden können, wird mit dieser Datei ein systemabhängiger Schlüssel erzeugt.
- *
+ * - i18n.go: Für die Internationalisierung der Fehlermeldungen
  */
 
 import (
@@ -34,7 +34,9 @@ import (
 
 // PASSWORD_IS_SECURE is an Indicator that the password is only stored encrypted.
 // All other values are interpreted as a new password and then encrypted.
-const PASSWORD_IS_SECURE = "Hier neues Passwort eintragen"
+var PASSWORD_IS_SECURE string    // String to be written
+var PASSWORD_IS_SECURE_en string // String to be recognized
+var PASSWORD_IS_SECURE_de string // String to be recognized
 
 var encryptionKey []byte
 var initialized = false
@@ -49,18 +51,21 @@ var initialized = false
  * @param cleanConfig	Für den Fall, dass man die Passwörter doch nochmal im Klartext braucht, kann damit erzwungen werden, die Datei mit Klartextpasswörtern zu schreiben.
  * @return error	Fehlermeldung, wenn die Config-Datei nicht gelesen werden konnte
  */
-func loadConfig(config interface{}, version int, path string, cleanConfig bool) error {
+func loadConfig(config interface{}, version int, path string, cleanConfig bool, getHardwareID_func ...func() (uint64, error)) error {
 
 	var file []byte
 
-	config_init()
+	if len(getHardwareID_func) > 0 {
+		config_init(getHardwareID_func[0])
+	} else {
+		config_init(getHardwareID)
+	}
 
 	_, err := os.Stat(path)
 	if !os.IsNotExist(err) {
 		file, err = os.ReadFile(path)
 		if err != nil {
-			//lint:ignore ST1005 German error message requires capitalization
-			return fmt.Errorf("Failed to read config file: %v", err)
+			return fmt.Errorf("failed to read config file: %v", err)
 		}
 	} else {
 		file = make([]byte, 0)
@@ -121,19 +126,25 @@ func loadConfig(config interface{}, version int, path string, cleanConfig bool) 
  * For transferring files of the first version of this application, an old,
  * insecure key generation procedure can also be used.
  */
-func config_init() {
+func config_init(getHardwareID_func func() (uint64, error)) {
 	if !initialized {
 		// Generate encryption key based on Hardware IS
-		hardwareID, err := getHardwareID()
+		hardwareID, err := getHardwareID_func()
 		if err != nil {
-			//lint:ignore (ST1005) German error message requires capitalization
-			log.Fatalf("Config: Hardware ID kann nicht bestimmt werden")
+			log.Fatalf(t("config.hardware_id_failed"))
 		}
 		randGenSeeded := mathRand.NewSource(int64(hardwareID))
 		encryptionKey = make([]byte, 32)
 		for i := range encryptionKey {
 			encryptionKey[i] = byte(randGenSeeded.Int63() >> 16 & 0xff)
 		}
+		curr_lang := getCurrentLanguage()
+		setLanguage("de")
+		PASSWORD_IS_SECURE_de = t("app.password_message")
+		setLanguage("en")
+		PASSWORD_IS_SECURE_en = t("app.password_message")
+		setLanguage(curr_lang)
+		PASSWORD_IS_SECURE = t("app.password_message")
 	}
 	initialized = true
 }
@@ -149,15 +160,14 @@ func updateDefaultValues(v reflect.Value) error {
 	if v.Kind() != reflect.Struct {
 		return nil
 	}
-	t := v.Type()
+	type_info := v.Type()
 	// Iterate through all fields
-	for i := 0; i < t.NumField(); i++ {
-		field := t.Field(i)
+	for i := 0; i < type_info.NumField(); i++ {
+		field := type_info.Field(i)
 		fieldValue := v.Field(i)
 		if field.Type.Kind() == reflect.Struct {
 			if err := updateDefaultValues(fieldValue); err != nil {
-				//lint:ignore ST1005 German error message requires capitalization
-				return fmt.Errorf("Fehler beim Auslesen der default-Version der config-Datei: %v", err)
+				return fmt.Errorf(t("config.default_error"), err)
 			}
 		} else if field.Type.Kind() == reflect.Slice {
 			for i := 0; i < fieldValue.Len(); i++ {
@@ -176,20 +186,17 @@ func updateDefaultValues(v reflect.Value) error {
 				case reflect.Int, reflect.Int64:
 					value, err := strconv.Atoi(defaultValue)
 					if err != nil {
-						//lint:ignore ST1005 German error message requires capitalization
-						return fmt.Errorf("Fehler beim Auslesen der default-Version der config-Datei: %v", err)
+						return fmt.Errorf(t("config.default_error"), err)
 					}
 					fieldValue.SetInt(int64(value))
 				case reflect.Bool:
 					boolValue, err := strconv.ParseBool(defaultValue)
 					if err != nil {
-						//lint:ignore ST1005 German error message requires capitalization
-						return fmt.Errorf("Fehler beim Auslesen der default-Version der config-Datei: %v", err)
+						return fmt.Errorf(t("config.default_error"), err)
 					}
 					fieldValue.SetBool(boolValue)
 				default:
-					//lint:ignore ST1005 German error message requires capitalization
-					return fmt.Errorf("Unsupported type for default value: %v", fieldValue.Kind())
+					return fmt.Errorf(t("config.default_unsupported"), fieldValue.Kind())
 				}
 			}
 		}
@@ -241,7 +248,6 @@ func updateVersionAndPasswords(v reflect.Value, version int, changed *bool) erro
 			if field.Name == "Version" {
 				if fieldValue.Int() != int64(version) {
 					fieldValue.SetInt(int64(version))
-					//fmt.Printf(" neuer Wert %d\n", version)
 					*changed = true
 				}
 			}
@@ -251,7 +257,7 @@ func updateVersionAndPasswords(v reflect.Value, version int, changed *bool) erro
 				for j := 0; j < t.NumField(); j++ {
 					if t.Field(j).Name == pw_prefix+"Password" {
 						field2Value := v.Field(j)
-						if field2Value.String() != PASSWORD_IS_SECURE {
+						if field2Value.String() != PASSWORD_IS_SECURE_de && field2Value.String() != PASSWORD_IS_SECURE_en {
 							// Neues Passwort im Klartext gefunden
 							// Neues Secure_Password wird berechnet
 							password := encrypt(field2Value.String())
@@ -279,10 +285,10 @@ func decodePasswords(v reflect.Value) error {
 	if v.Kind() != reflect.Struct {
 		return nil
 	}
-	t := v.Type()
+	type_info := v.Type()
 	// Iterate through all fields
-	for i := 0; i < t.NumField(); i++ {
-		field := t.Field(i)
+	for i := 0; i < type_info.NumField(); i++ {
+		field := type_info.Field(i)
 		fieldValue := v.Field(i)
 
 		// Process recursively nested structures
@@ -302,13 +308,12 @@ func decodePasswords(v reflect.Value) error {
 			// Password processing
 			if strings.HasSuffix(field.Name, "SecurePassword") {
 				pw_prefix := strings.TrimSuffix(field.Name, "SecurePassword")
-				for j := 0; j < t.NumField(); j++ {
-					if t.Field(j).Name == pw_prefix+"Password" {
+				for j := 0; j < type_info.NumField(); j++ {
+					if type_info.Field(j).Name == pw_prefix+"Password" {
 						field2Value := v.Field(j)
 						password, err := decrypt(fieldValue.String())
 						if err != nil {
-							//lint:ignore ST1005 German error message requires capitalization
-							return fmt.Errorf("Failed to decrypt %s password: %v", pw_prefix, err)
+							return fmt.Errorf(t("config.decrypt_failed", pw_prefix), err)
 						}
 						field2Value.SetString(password)
 						break

@@ -11,7 +11,6 @@ package main
  * Abhängigkeiten:
  * config.go: Einlesen der Config-Datei mit sicheren Passwörtern
  * hardware-id.go: Bestimmung einer eindeutigen System-ID für die Schlüssel von config.go
- * i18n.go: Internationalisierung der Ausgaben und Fehlermeldungen
  *
  * Version: In Datei version.go!
  *
@@ -20,7 +19,6 @@ package main
  * Repository: Https://github.com/janmz/wp_plugin_releaser
  *
  * Change_log:
- * 17.8.2025	Internationalisierung hinzugefügt
  * 12.8.2025	Über github bereitgestellt
  * 8.8.2025		Erste Version erstellt und getestet
  *
@@ -97,12 +95,6 @@ var logFile *os.File
 var config ConfigType
 
 func main() {
-	// Initialize i18n first
-	if err := initI18n(); err != nil {
-		fmt.Printf("Error initializing i18n: %v\n", err)
-		os.Exit(1)
-	}
-
 	// Determine working directory
 	var workDir string
 	if len(os.Args) > 1 {
@@ -111,30 +103,30 @@ func main() {
 		var err error
 		workDir, err = os.Getwd()
 		if err != nil {
-			fmt.Printf(t("error.current_directory", err) + "\n")
+			fmt.Printf("Fehler beim Ermitteln des aktuellen Verzeichnisses: %v\n", err)
 			os.Exit(1)
 		}
 	}
 	if _, err := os.Stat(workDir); os.IsNotExist(err) {
-		fmt.Printf(t("error.no_directory", workDir) + "\n")
+		fmt.Printf("Das Verzeichnis %s existiert nicht oder ist nicht lesbar\n", workDir)
 		os.Exit(1)
 	}
 	updateConfigPath := filepath.Join(workDir, "update.config")
 	if _, err := os.Stat(updateConfigPath); os.IsNotExist(err) {
-		fmt.Printf(t("error.no_config", workDir) + "\n")
+		fmt.Printf("Das Verzeichnis %s enthält keine Datei update.config\n", workDir)
 		os.Exit(1)
 	}
 	// Initialize logging
 	initLogging(workDir)
 	defer logFile.Close()
 
-	logAndPrint(t("app.version", Version, BuildTime))
-	logAndPrint(t("app.working_directory", workDir))
+	logAndPrint("WordPress Plugin Release Tool Version " + Version + " vom " + BuildTime + " gestartet")
+	logAndPrint(fmt.Sprintf("Arbeitsverzeichnis: %s", workDir))
 
 	// Read config file
 	err := loadConfig(&config, 2, updateConfigPath, false)
 	if err != nil {
-		logAndPrint(t("error.config_read", err))
+		logAndPrint(fmt.Sprintf("Fehler beim Lesen der Konfiguration: %v", err))
 		os.Exit(1)
 	}
 
@@ -142,23 +134,23 @@ func main() {
 	updateInfoPath := filepath.Join(workDir, "Updates", "update_info.json")
 	updateInfo, allData, err := getUpdateInfo(updateInfoPath)
 	if err != nil {
-		logAndPrint(t("error.update_info_read", err))
+		logAndPrint(fmt.Sprintf("Fehler beim Lesen der Update-Info: %v", err))
 		os.Exit(1)
 	}
 
 	// Read and update main PHP file
 	currentVersion, err := processMainPHPFile(workDir, config.MainPHPFile, updateInfo)
 	if err != nil {
-		logAndPrint(t("error.php_processing", err))
+		logAndPrint(fmt.Sprintf("Fehler beim Verarbeiten der PHP-Datei: %v", err))
 		os.Exit(1)
 	}
 
-	logAndPrint(t("log.current_version_detected", currentVersion))
+	logAndPrint(fmt.Sprintf("Aktuelle Version ermittelt: %s", currentVersion))
 
 	// Update update_info.json if needed
 	err = processUpdateInfo(updateInfo, currentVersion)
 	if err != nil {
-		logAndPrint(t("error.update_info_processing", err))
+		logAndPrint(fmt.Sprintf("Fehler beim Anpassen der Update-Info: %v", err))
 		os.Exit(1)
 	}
 	remoteZIPName := filepath.Base(updateInfo.DownloadURL)
@@ -176,15 +168,15 @@ func main() {
 	zipPath := filepath.Join(workDir, "Updates", zipFileName)
 	err = createZipFile(workDir, zipPath, config.SkipPattern, updateInfo.Slug)
 	if err != nil {
-		logAndPrint(t("error.zip_creation", err))
+		logAndPrint(fmt.Sprintf("Fehler beim Erstellen der ZIP-Datei: %v", err))
 		os.Exit(1)
 	}
 	updateInfo.DownloadURL = strings.TrimSuffix(updateInfo.DownloadURL, remoteZIPName) + zipFileName
-	logAndPrint(t("log.download_url_set", updateInfo.DownloadURL))
+	logAndPrint(fmt.Sprintf("Download URL auf '%s' gesetzt!", updateInfo.DownloadURL))
 
 	err = setUpdateInfo(updateInfo, allData, updateInfoPath)
 	if err != nil {
-		logAndPrint(t("error.update_info_processing", err))
+		logAndPrint(fmt.Sprintf("Fehler beim Schreiben der Update-Info: %v", err))
 		os.Exit(1)
 	}
 
@@ -194,15 +186,15 @@ func main() {
 	if config.SSHHost != "" && config.SSHUser != "" {
 		err = uploadFiles(&config, zipPath, updateInfoPath, workDir, updateInfo)
 		if err != nil {
-			logAndPrint(t("error.upload", err))
+			logAndPrint(fmt.Sprintf("Fehler beim Upload: %v", err))
 		} else {
-			logAndPrint(t("log.upload_completed"))
+			logAndPrint("Upload erfolgreich abgeschlossen")
 		}
 	} else {
-		logAndPrint(t("log.no_ssh_config"))
+		logAndPrint("Keine SSH-Konfiguration gefunden, Upload übersprungen")
 	}
 
-	logAndPrint(t("app.release_process_completed"))
+	logAndPrint("Release-Prozess erfolgreich abgeschlossen")
 }
 
 func initLogging(workDir string) {
@@ -210,7 +202,7 @@ func initLogging(workDir string) {
 	var err error
 	logFile, err = os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
-		fmt.Printf(t("error.log_file", err) + "\n")
+		fmt.Printf("Fehler beim Öffnen der Log-Datei: %v\n", err)
 		os.Exit(1)
 	}
 	logger = log.New(logFile, "", log.LstdFlags)
@@ -223,7 +215,7 @@ func logAndPrint(message string) {
 
 func processMainPHPFile(workDir, mainPHPFile string, updateInfo *UpdateInfo) (string, error) {
 	phpFilePath := filepath.Join(workDir, mainPHPFile)
-	logAndPrint(t("log.processing_php", phpFilePath))
+	logAndPrint(fmt.Sprintf("Verarbeite PHP-Datei: %s", phpFilePath))
 
 	content, err := os.ReadFile(phpFilePath)
 	if err != nil {
@@ -239,7 +231,7 @@ func processMainPHPFile(workDir, mainPHPFile string, updateInfo *UpdateInfo) (st
 	var commentVersion string
 	if len(commentMatch) > 1 {
 		commentVersion = commentMatch[1]
-		logAndPrint(t("log.version_comment_found", commentVersion))
+		logAndPrint(fmt.Sprintf("Version im Plugin-Kommentar gefunden: %s", commentVersion))
 	}
 
 	// Extract version from class property
@@ -249,26 +241,27 @@ func processMainPHPFile(workDir, mainPHPFile string, updateInfo *UpdateInfo) (st
 	var classVersion string
 	if len(classMatch) > 1 {
 		classVersion = classMatch[1]
-		logAndPrint(t("log.version_class_found", classVersion))
+		logAndPrint(fmt.Sprintf("Version in Klassen-Property gefunden: %s", classVersion))
 	}
 
 	// Determine current version (higher of both)
 	currentVersion := getHigherVersion(commentVersion, classVersion)
 	if currentVersion == "" {
-		return "", fmt.Errorf(t("error.no_valid_version"))
+		//lint:ignore ST1005 German error message requires capitalization
+		return "", fmt.Errorf("Keine gültige Version gefunden")
 	} else {
-		logAndPrint(t("log.update_info_version_updated", currentVersion))
+		logAndPrint(fmt.Sprintf("update_info.json Version aktualisiert auf: %s", currentVersion))
 	}
 
 	// Update both versions to current version
 	if commentVersion != "" && commentVersion != currentVersion {
 		contentStr = commentVersionRegex.ReplaceAllString(contentStr, fmt.Sprintf("* Version: %s", currentVersion))
-		logAndPrint(t("log.version_comment_updated", currentVersion))
+		logAndPrint(fmt.Sprintf("Plugin-Kommentar Version aktualisiert auf: %s", currentVersion))
 	}
 
 	if classVersion != "" && classVersion != currentVersion {
 		contentStr = classVersionRegex.ReplaceAllString(contentStr, fmt.Sprintf("private $$version = '%s'", currentVersion))
-		logAndPrint(t("log.version_class_updated", currentVersion))
+		logAndPrint(fmt.Sprintf("Klassen-Property Version aktualisiert auf: %s", currentVersion))
 	}
 
 	// Update Last-Update comment
@@ -277,13 +270,13 @@ func processMainPHPFile(workDir, mainPHPFile string, updateInfo *UpdateInfo) (st
 
 	if lastUpdateRegex.MatchString(contentStr) {
 		contentStr = lastUpdateRegex.ReplaceAllString(contentStr, fmt.Sprintf("* Last-Update: %s", currentDate))
-		logAndPrint(t("log.last_update_updated", currentDate))
+		logAndPrint(fmt.Sprintf("Last-Update Kommentar aktualisiert auf: %s", currentDate))
 	} else {
 		// Add Last-Update comment after Version line
 		versionLineRegex := regexp.MustCompile(`(\*\s*Version:\s*[0-9]+\.[0-9]+(?:\.[0-9]+)?\s*\n)`)
 		if versionLineRegex.MatchString(contentStr) {
 			contentStr = versionLineRegex.ReplaceAllString(contentStr, fmt.Sprintf("$1 * Last-Update: %s\n", currentDate))
-			logAndPrint(t("log.last_update_added", currentDate))
+			logAndPrint(fmt.Sprintf("Last-Update Kommentar hinzugefügt: %s", currentDate))
 		}
 	}
 	// Check the Integration of PluginUpdateChecker
@@ -291,22 +284,24 @@ func processMainPHPFile(workDir, mainPHPFile string, updateInfo *UpdateInfo) (st
 	pucMatch := pucRegex.FindStringSubmatchIndex(contentStr)
 	newDownloadURL := strings.Replace(updateInfo.DownloadURL, filepath.Base(updateInfo.DownloadURL), "update_info.json", 1)
 	if len(pucMatch) != 8 {
-		return "", fmt.Errorf(t("error.no_valid_puc", phpFilePath))
+		//lint:ignore ST1005 German error message requires capitalization
+		return "", fmt.Errorf("Keine gültige Puc-Integration gefunden, bitte Datei %s überarbeiten", phpFilePath)
 	} else {
 		oldDownloadURL := ""
 		oldSlug := ""
 		if pucMatch[2] > 0 && (pucMatch[3] > pucMatch[2]) {
 			oldDownloadURL = contentStr[pucMatch[2]:pucMatch[3]]
-			logAndPrint(t("log.puc_download_url", oldDownloadURL))
+			logAndPrint(fmt.Sprintf("Im PUC-Aufruf DownloadURL gefunden: %s", oldDownloadURL))
 		} else {
-			return "", fmt.Errorf(t("error.no_valid_puc", phpFilePath))
+			//lint:ignore ST1005 German error message requires capitalization
+			return "", fmt.Errorf("Keine gültige Puc-Integration gefunden, bitte Datei %s überarbeiten", phpFilePath)
 		}
 		if pucMatch[4] > 0 && (pucMatch[5] > pucMatch[4]) {
-			logAndPrint(t("log.puc_comment", contentStr[pucMatch[4]:pucMatch[5]]))
+			logAndPrint(fmt.Sprintf("Im PUC-Aufruf Kommentar gefunden: %s", contentStr[pucMatch[4]:pucMatch[5]]))
 		}
 		if pucMatch[6] > 0 && (pucMatch[7] > pucMatch[6]) {
 			oldSlug = contentStr[pucMatch[6]:pucMatch[7]]
-			logAndPrint(t("log.puc_slug", oldSlug))
+			logAndPrint(fmt.Sprintf("Im PUC AUfruf Slug gefunden: %s", oldSlug))
 		}
 		needUpdate := false
 		lengthdiff := 0
@@ -322,21 +317,21 @@ func processMainPHPFile(workDir, mainPHPFile string, updateInfo *UpdateInfo) (st
 			needUpdate = true
 		}
 		if needUpdate {
-			logAndPrint(t("log.puc_changed", contentStr[pucMatch[0]:(pucMatch[1]+lengthdiff)]))
+			logAndPrint(fmt.Sprintf("Puc-Integration geändert zu: %s", contentStr[pucMatch[0]:(pucMatch[1]+lengthdiff)]))
 		}
 	}
 
 	// Write updated content back to file
 	err = os.Rename(phpFilePath, phpFilePath+".bak")
 	if err != nil {
-		return "", fmt.Errorf(t("error.rename_file"), err)
+		return "", fmt.Errorf("alte Datei konnte nicht umbenannt werden: %v", err)
 	}
 	err = os.WriteFile(phpFilePath, []byte(contentStr), 0644)
 	if err != nil {
-		return "", fmt.Errorf(t("error.write_php"), err)
+		return "", fmt.Errorf("PHP-Datei konnte nicht geschrieben werden: %v", err)
 	}
 
-	logAndPrint(t("log.php_updated"))
+	logAndPrint("PHP-Datei erfolgreich aktualisiert")
 	return currentVersion, nil
 }
 
@@ -403,32 +398,33 @@ func marshalWithoutHTMLescaping(data interface{}) ([]byte, error) {
 // @return *UpdateInfo, map[string]interface{}, error
 // @see UpdateInfo
 func getUpdateInfo(updateInfoPath string) (*UpdateInfo, map[string]interface{}, error) {
-	logAndPrint(t("log.reading_update_info", updateInfoPath))
+	logAndPrint(fmt.Sprintf("Einlesen Update-Info: %s", updateInfoPath))
 
 	// Prüfen, ob die Datei existiert
 	if _, err := os.Stat(updateInfoPath); os.IsNotExist(err) {
-		return nil, nil, fmt.Errorf(t("error.update_info_missing"))
+		return nil, nil, fmt.Errorf("update_info.json ist nicht vorhanden")
 	}
 
 	data, err := os.ReadFile(updateInfoPath)
 	if err != nil {
-		return nil, nil, fmt.Errorf(t("error.update_info_read_file"), err)
+		return nil, nil, fmt.Errorf("update_info.json konnte nicht gelesen werden: %v", err)
 	}
 
 	// 1. Alle Daten in eine Map einlesen, um unbekannte Felder zu erhalten.
 	var allData map[string]interface{}
 	if err := json.Unmarshal(data, &allData); err != nil {
-		return nil, nil, fmt.Errorf(t("error.update_info_invalid_json"), err)
+		return nil, nil, fmt.Errorf("update_info.json hat ungültiges JSON-Format: %v", err)
 	}
 
 	// 2. Die gleichen Daten in das Struct einlesen, um mit bekannten Feldern typsicher zu arbeiten.
 	// Unbekannte Felder werden hierbei ignoriert.
 	var updateInfo UpdateInfo
 	if err := json.Unmarshal(data, &updateInfo); err != nil {
-		return nil, nil, fmt.Errorf(t("error.update_info_structure"), err)
+		//lint:ignore ST1005 German error message requires capitalization
+		return nil, nil, fmt.Errorf("Struktur von update_info.json konnte nicht analysiert werden: %v", err)
 	}
 
-	logAndPrint(t("log.current_version_update_info", updateInfo.Version))
+	logAndPrint(fmt.Sprintf("Aktuelle Version in update_info.json: %s", updateInfo.Version))
 
 	// Struct und die komplette Map zurückgeben
 	return &updateInfo, allData, nil
@@ -436,7 +432,7 @@ func getUpdateInfo(updateInfoPath string) (*UpdateInfo, map[string]interface{}, 
 
 func processUpdateInfo(updateInfo *UpdateInfo, currentVersion string) error {
 
-	logAndPrint(t("log.processing_update_info"))
+	logAndPrint("Verarbeite Update-Infos")
 
 	// Check if update is needed
 	if getHigherVersion(updateInfo.Version, currentVersion) == currentVersion && updateInfo.Version != currentVersion {
@@ -453,10 +449,12 @@ func setUpdateInfo(updateInfo *UpdateInfo, allData map[string]interface{}, updat
 	var structAsMap map[string]interface{}
 	tempData, err := json.Marshal(updateInfo)
 	if err != nil {
-		return fmt.Errorf(t("error.json_prepare"), err)
+		//lint:ignore ST1005 German error message requires capitalization
+		return fmt.Errorf("Fehler beim Vorbereiten der JSON-Daten aus dem Struct: %v", err)
 	}
 	if err := json.Unmarshal(tempData, &structAsMap); err != nil {
-		return fmt.Errorf(t("error.json_mix"), err)
+		//lint:ignore ST1005 German error message requires capitalization
+		return fmt.Errorf("Fehler beim Mischen der JSON-Daten: %v", err)
 	}
 
 	// Die aktualisierten Werte aus dem Struct in die Map mit allen Daten mischen.
@@ -468,33 +466,35 @@ func setUpdateInfo(updateInfo *UpdateInfo, allData map[string]interface{}, updat
 	// Die finale Map mit unserer neuen Funktion ohne HTML-Escaping schreiben.
 	updatedData, err := marshalWithoutHTMLescaping(allData)
 	if err != nil {
-		return fmt.Errorf(t("error.json_final"), err)
+		//lint:ignore ST1005 German error message requires capitalization
+		return fmt.Errorf("Fehler beim Erstellen der finalen JSON-Daten: %v", err)
 	}
 
 	// Backup der alten Datei erstellen
 	backupFilePath := updateInfoPath + ".bak"
 	if err := os.Rename(updateInfoPath, backupFilePath); err != nil {
-		return fmt.Errorf(t("error.backup_create"), err)
+		//lint:ignore ST1005 German error message requires capitalization
+		return fmt.Errorf("Fehler beim Erstellen der Sicherung für update_info.json: %v", err)
 	}
-	logAndPrint(t("log.update_info_backup", backupFilePath))
+	logAndPrint(fmt.Sprintf("Sicherung von update_info.json erstellt: %s", backupFilePath))
 
 	// Neue Datei schreiben
 	if err := os.WriteFile(updateInfoPath, updatedData, 0644); err != nil {
 		return fmt.Errorf("update_info.json konnte nicht geschrieben werden: %v", err)
 	}
 
-	logAndPrint(t("log.update_info_updated", updateInfo.Version))
+	logAndPrint(fmt.Sprintf("update_info.json aktualisiert auf Version %s", updateInfo.Version))
 
 	return nil
 }
 
 func createZipFile(sourceDir, zipPath string, skipPatterns []string, slug string) error {
 
-	logAndPrint(t("log.creating_zip", zipPath))
+	logAndPrint(fmt.Sprintf("Erstelle ZIP-Datei: %s", zipPath))
 
 	zipFile, err := os.Create(zipPath)
 	if err != nil {
-		return fmt.Errorf(t("error.zip_create"), err)
+		return fmt.Errorf("ZIP-Datei konnte nicht erstellt werden: %v", err)
 	}
 	defer zipFile.Close()
 
@@ -512,7 +512,7 @@ func createZipFile(sourceDir, zipPath string, skipPatterns []string, slug string
 	}
 
 	allSkipPatterns := append(defaultSkipPatterns, skipPatterns...)
-	logAndPrint(t("log.skip_patterns", allSkipPatterns))
+	logAndPrint(fmt.Sprintf("Skip-Patterns: %v", allSkipPatterns))
 
 	err = filepath.Walk(sourceDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -533,10 +533,10 @@ func createZipFile(sourceDir, zipPath string, skipPatterns []string, slug string
 		// Check skip patterns
 		if shouldSkip(relPath, allSkipPatterns) {
 			if info.IsDir() {
-				logAndPrint(t("log.skip_directory", relPath))
+				logAndPrint(fmt.Sprintf("Überspringe Verzeichnis: %s", relPath))
 				return filepath.SkipDir
 			}
-			logAndPrint(t("log.skip_file", relPath))
+			logAndPrint(fmt.Sprintf("Überspringe Datei: %s", relPath))
 			return nil
 		}
 
@@ -562,15 +562,16 @@ func createZipFile(sourceDir, zipPath string, skipPatterns []string, slug string
 			return err
 		}
 
-		logAndPrint(t("log.file_added", relPath))
+		logAndPrint(fmt.Sprintf("Datei hinzugefügt: %s", relPath))
 		return nil
 	})
 
 	if err != nil {
-		return fmt.Errorf(t("error.walk_files"), err)
+		//lint:ignore ST1005 German error message requires capitalization
+		return fmt.Errorf("Fehler beim Durchlaufen der Dateien: %v", err)
 	}
 
-	logAndPrint(t("log.zip_created"))
+	logAndPrint("ZIP-Datei erfolgreich erstellt")
 	return nil
 }
 
@@ -594,7 +595,7 @@ func shouldSkip(path string, patterns []string) bool {
 }
 
 func uploadFiles(config *ConfigType, zipPath, updateInfoPath string, workDir string, updateInfo *UpdateInfo) error {
-	logAndPrint(t("log.ssh_upload_start"))
+	logAndPrint("Beginne SSH-Upload")
 
 	// Setup authentication methods
 	var authMethods []ssh.AuthMethod
@@ -603,14 +604,14 @@ func uploadFiles(config *ConfigType, zipPath, updateInfoPath string, workDir str
 	if config.SSHKeyFile != "" {
 		key, err := os.ReadFile(config.SSHKeyFile)
 		if err != nil {
-			logAndPrint(t("log.ssh_key_warning", err))
+			logAndPrint(fmt.Sprintf("Warnung: SSH-Schlüssel konnte nicht gelesen werden: %v", err))
 		} else {
 			signer, err := ssh.ParsePrivateKey(key)
 			if err != nil {
-				logAndPrint(t("log.ssh_key_parse_warning", err))
+				logAndPrint(fmt.Sprintf("Warnung: SSH-Schlüssel konnte nicht geparst werden: %v", err))
 			} else {
 				authMethods = append(authMethods, ssh.PublicKeys(signer))
-				logAndPrint(t("log.ssh_key_added"))
+				logAndPrint("SSH-Schlüssel-Authentifizierung hinzugefügt")
 			}
 		}
 	}
@@ -618,11 +619,12 @@ func uploadFiles(config *ConfigType, zipPath, updateInfoPath string, workDir str
 	// Add password authentication if password is provided
 	if config.SSHPassword != "" {
 		authMethods = append(authMethods, ssh.Password(config.SSHPassword))
-		logAndPrint(t("log.ssh_password_added"))
+		logAndPrint("SSH-Passwort-Authentifizierung hinzugefügt")
 	}
 
 	if len(authMethods) == 0 {
-		return fmt.Errorf(t("error.ssh_no_auth"))
+		//lint:ignore ST1005 German error message requires capitalization
+		return fmt.Errorf("Keine SSH-Authentifizierungsmethode konfiguriert (ssh_key_file oder ssh_password erforderlich)")
 	}
 
 	// Setup SSH config
@@ -641,14 +643,14 @@ func uploadFiles(config *ConfigType, zipPath, updateInfoPath string, workDir str
 
 	// Connect to SSH server
 	addr := fmt.Sprintf("%s:%s", config.SSHHost, port)
-	logAndPrint(t("log.ssh_connecting", addr))
+	logAndPrint(fmt.Sprintf("Verbinde zu SSH-Server: %s", addr))
 
 	client, err := ssh.Dial("tcp", addr, sshConfig)
 	if err != nil {
-		return fmt.Errorf(t("error.ssh_connection"), err)
+		return fmt.Errorf("SSH-Verbindung fehlgeschlagen: %v", err)
 	}
 	defer client.Close()
-	logAndPrint(t("log.ssh_connected"))
+	logAndPrint("SSH-Verbindung erfolgreich hergestellt")
 
 	// Parse download URL to get remote path
 	remoteLocalPath, err := parseRemotePath(updateInfo.DownloadURL, config.SSHDirBase)
@@ -656,23 +658,23 @@ func uploadFiles(config *ConfigType, zipPath, updateInfoPath string, workDir str
 		return err
 	}
 
-	logAndPrint(t("log.remote_path", remoteLocalPath))
+	logAndPrint(fmt.Sprintf("Remote-Pfad: %s", remoteLocalPath))
 
 	// Create remote directory if it doesn't exist
 	err = createRemoteDir(client, remoteLocalPath)
 	if err != nil {
-		logAndPrint(t("log.remote_dir_warning", err))
+		logAndPrint(fmt.Sprintf("Warnung: Konnte Remote-Verzeichnis nicht erstellen: %v", err))
 	}
 	// Upload ZIP file using SFTP
 	err = uploadFileViaSFTP(client, zipPath, filepath.Join(remoteLocalPath, filepath.Base(zipPath)))
 	if err != nil {
-		return fmt.Errorf(t("error.zip_upload"), err)
+		return fmt.Errorf("ZIP-Upload fehlgeschlagen: %v", err)
 	}
 
 	// Upload update_info.json using SFTP
 	err = uploadFileViaSFTP(client, updateInfoPath, filepath.Join(remoteLocalPath, "update_info.json"))
 	if err != nil {
-		return fmt.Errorf(t("error.update_info_upload"), err)
+		return fmt.Errorf("update_info.json Upload fehlgeschlagen: %v", err)
 	}
 	updatePath := filepath.Join(workDir, "Updates")
 	if len(updateInfo.Banners) > 0 {
@@ -681,16 +683,16 @@ func uploadFiles(config *ConfigType, zipPath, updateInfoPath string, workDir str
 				bannerFilename := filepath.Base(bannerUrl)
 				localBannerPath := filepath.Join(updatePath, bannerFilename)
 				if _, err := os.Stat(localBannerPath); os.IsNotExist(err) {
-					logAndPrint(t("log.banner_not_found", key, localBannerPath))
+					logAndPrint(fmt.Sprintf("Warnung: Banner-Datei für Eintrag \"%s\" nicht gefunden: %s", key, localBannerPath))
 				} else {
 					remoteBannerPath := filepath.Join(remoteLocalPath, bannerFilename)
 					err = uploadFileViaSFTP(client, localBannerPath, remoteBannerPath)
 					if err != nil {
-						return fmt.Errorf(t("error.banner_upload"), err)
+						return fmt.Errorf("Banner-Upload fehlgeschlagen: %v", err)
 					}
 				}
 			} else {
-				logAndPrint(t("log.banner_no_url", key, bannerUrl))
+				logAndPrint(fmt.Sprintf("Warnung: Banner-Eintrag \"%s\" ist keine URL (%s)", key, bannerUrl))
 			}
 		}
 	}
@@ -700,16 +702,16 @@ func uploadFiles(config *ConfigType, zipPath, updateInfoPath string, workDir str
 				iconFilename := filepath.Base(iconUrl)
 				localIconPath := filepath.Join(updatePath, iconFilename)
 				if _, err := os.Stat(localIconPath); os.IsNotExist(err) {
-					logAndPrint(t("log.icon_not_found", key, localIconPath))
+					logAndPrint(fmt.Sprintf("Warnung: Icon-Datei für Eintrag \"%s\" nicht gefunden: %s", key, localIconPath))
 				} else {
 					remoteIconPath := filepath.Join(remoteLocalPath, iconFilename)
 					err = uploadFileViaSFTP(client, localIconPath, remoteIconPath)
 					if err != nil {
-						return fmt.Errorf(t("error.icon_upload"), err)
+						return fmt.Errorf("Icon-Upload fehlgeschlagen: %v", err)
 					}
 				}
 			} else {
-				logAndPrint(t("log.icon_no_url", key, iconUrl))
+				logAndPrint(fmt.Sprintf("Warnung: Icon-Eintrag \"%s\" ist keine URL (%s)", key, iconUrl))
 			}
 		}
 	}
@@ -730,11 +732,13 @@ func parseRemotePath(downloadURL string, basedir string) (string, error) {
 		path = "/" + path
 	}
 	if strings.HasSuffix(path, "/") {
-		return "", fmt.Errorf(t("error.url_ends_directory", downloadURL))
+		//lint:ignore ST1005 German error message requires capitalization
+		return "", fmt.Errorf("%s endet in einem Verzeichnis!", downloadURL)
 	}
 	pos := strings.LastIndex(path, "/")
 	if pos <= 0 {
-		return "", fmt.Errorf(t("error.url_no_filename", downloadURL))
+		//lint:ignore ST1005 German error message requires capitalization
+		return "", fmt.Errorf("%s enthält keinen Dateinamen!", downloadURL)
 	} else {
 		path = path[:pos]
 	}
@@ -755,13 +759,13 @@ func createRemoteDir(client *ssh.Client, remotePath string) error {
 		return err
 	}
 
-	logAndPrint(t("log.remote_dir_created", remotePath))
+	logAndPrint(fmt.Sprintf("Remote-Verzeichnis erstellt: %s", remotePath))
 	return nil
 }
 
 func uploadFileViaSFTP(client *ssh.Client, localPath, remotePath string) error {
 	remotePath = filepath.ToSlash(remotePath)
-	logAndPrint(t("log.uploading_file", localPath, remotePath))
+	logAndPrint(fmt.Sprintf("Lade Datei hoch: %s -> %s", localPath, remotePath))
 
 	// Create SFTP session
 	session, err := client.NewSession()
@@ -812,6 +816,6 @@ func uploadFileViaSFTP(client *ssh.Client, localPath, remotePath string) error {
 		return err
 	}
 
-	logAndPrint(t("log.file_uploaded", filepath.Base(localPath)))
+	logAndPrint(fmt.Sprintf("Datei erfolgreich hochgeladen: %s", filepath.Base(localPath)))
 	return nil
 }
