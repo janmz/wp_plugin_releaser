@@ -36,11 +36,14 @@
   "error.json_mix": "Fehler beim Mischen der JSON-Daten: %v",
   "error.json_final": "Fehler beim Erstellen der finalen JSON-Daten: %v",
   "error.backup_create": "Fehler beim Erstellen der Sicherung für update_info.json: %v",
+  "error.zip_version_remove": "Fehler: Konnte Versionsnummer im Namen der ZIP-Datei nicht entfernen",
+  "error.php_read_file": "PHP-Datei konnte nicht gelesen werden: %v",
+  "error.update_info_write_file": "update_info.json konnte nicht geschrieben werden: %v",
   
-  "config.hardware_id_failed": "Config: Hardware ID kann nicht bestimmt werden",
-  "config.default_error": "Fehler beim Auslesen der default-Version der config-Datei: %v",
-  "config.default_unsupported": "Nicht unterstützter Typ für Standard-Wert: %v",
-  "config.decrypt_failed": "Entschlüsselung des %s Passworts fehlgeschlagen: %v",
+  "test.app.name": "Teste i18n für sconfig",
+  "test.app.version": "Version %s vom %s",
+  "test.app.working_directory": "Das Arbeitsverzeichnis ist '%s'",
+  "test.error.no_directory": "Das Verzeichnis '%s' wurde nicht gefunden.",
   
   "log.processing_php": "Verarbeite PHP-Datei: %s",
   "log.version_comment_found": "Version im Plugin-Kommentar gefunden: %s",
@@ -85,5 +88,6 @@
   "log.upload_completed": "Upload erfolgreich abgeschlossen",
   "log.current_version_detected": "Aktuelle Version ermittelt: %s",
   "log.update_info_version_updated": "update_info.json Version aktualisiert auf: %s",
-  "log.download_url_set": "Download URL auf '%s' gesetzt!"
+  "log.download_url_set": "Download URL auf '%s' gesetzt!",
+  "log.zip_file_created": "ZIP-Datei erstellt: %s"
 }

@@ -43,6 +43,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/janmz/sconfig"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -97,11 +98,6 @@ var logFile *os.File
 var config ConfigType
 
 func main() {
-	// Initialize i18n first
-	if err := initI18n(); err != nil {
-		fmt.Printf("Error initializing i18n: %v\n", err)
-		os.Exit(1)
-	}
 
 	// Determine working directory
 	var workDir string
@@ -132,7 +128,7 @@ func main() {
 	logAndPrint(t("app.working_directory", workDir))
 
 	// Read config file
-	err := loadConfig(&config, 2, updateConfigPath, false)
+	err := sconfig.LoadConfig(&config, 2, updateConfigPath, false)
 	if err != nil {
 		logAndPrint(t("error.config_read", err))
 		os.Exit(1)
@@ -168,7 +164,7 @@ func main() {
 		updateInfo.Slug = remoteZIPName2
 	}
 	if re.MatchString(remoteZIPName2) {
-		logAndPrint("Fehler: Konnte Versionummer im Namen der ZIP-Datei nicht entfernen")
+		logAndPrint(t("error.zip_version_remove"))
 		remoteZIPName2 = strings.TrimSuffix(remoteZIPName2, ".zip")
 	}
 	// Create ZIP file
@@ -188,7 +184,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	logAndPrint(fmt.Sprintf("ZIP-Datei erstellt: %s", zipFileName))
+	logAndPrint(t("log.zip_file_created", zipFileName))
 
 	// Upload via SSH if configured
 	if config.SSHHost != "" && config.SSHUser != "" {
@@ -227,7 +223,7 @@ func processMainPHPFile(workDir, mainPHPFile string, updateInfo *UpdateInfo) (st
 
 	content, err := os.ReadFile(phpFilePath)
 	if err != nil {
-		return "", fmt.Errorf("PHP-Datei konnte nicht gelesen werden: %v", err)
+		return "", fmt.Errorf("%s", t("error.php_read_file", err))
 	}
 
 	contentStr := string(content)
@@ -255,7 +251,7 @@ func processMainPHPFile(workDir, mainPHPFile string, updateInfo *UpdateInfo) (st
 	// Determine current version (higher of both)
 	currentVersion := getHigherVersion(commentVersion, classVersion)
 	if currentVersion == "" {
-		return "", fmt.Errorf(t("error.no_valid_version"))
+		return "", fmt.Errorf("%s", t("error.no_valid_version"))
 	} else {
 		logAndPrint(t("log.update_info_version_updated", currentVersion))
 	}
@@ -291,7 +287,7 @@ func processMainPHPFile(workDir, mainPHPFile string, updateInfo *UpdateInfo) (st
 	pucMatch := pucRegex.FindStringSubmatchIndex(contentStr)
 	newDownloadURL := strings.Replace(updateInfo.DownloadURL, filepath.Base(updateInfo.DownloadURL), "update_info.json", 1)
 	if len(pucMatch) != 8 {
-		return "", fmt.Errorf(t("error.no_valid_puc", phpFilePath))
+		return "", fmt.Errorf("%s", t("error.no_valid_puc", phpFilePath))
 	} else {
 		oldDownloadURL := ""
 		oldSlug := ""
@@ -299,7 +295,7 @@ func processMainPHPFile(workDir, mainPHPFile string, updateInfo *UpdateInfo) (st
 			oldDownloadURL = contentStr[pucMatch[2]:pucMatch[3]]
 			logAndPrint(t("log.puc_download_url", oldDownloadURL))
 		} else {
-			return "", fmt.Errorf(t("error.no_valid_puc", phpFilePath))
+			return "", fmt.Errorf("%s", t("error.no_valid_puc", phpFilePath))
 		}
 		if pucMatch[4] > 0 && (pucMatch[5] > pucMatch[4]) {
 			logAndPrint(t("log.puc_comment", contentStr[pucMatch[4]:pucMatch[5]]))
@@ -407,18 +403,18 @@ func getUpdateInfo(updateInfoPath string) (*UpdateInfo, map[string]interface{}, 
 
 	// Prüfen, ob die Datei existiert
 	if _, err := os.Stat(updateInfoPath); os.IsNotExist(err) {
-		return nil, nil, fmt.Errorf(t("error.update_info_missing"))
+		return nil, nil, fmt.Errorf("%s", t("error.update_info_missing"))
 	}
 
 	data, err := os.ReadFile(updateInfoPath)
 	if err != nil {
-		return nil, nil, fmt.Errorf(t("error.update_info_read_file"), err)
+		return nil, nil, fmt.Errorf("%s", t("error.update_info_read_file", err))
 	}
 
 	// 1. Alle Daten in eine Map einlesen, um unbekannte Felder zu erhalten.
 	var allData map[string]interface{}
 	if err := json.Unmarshal(data, &allData); err != nil {
-		return nil, nil, fmt.Errorf(t("error.update_info_invalid_json"), err)
+		return nil, nil, fmt.Errorf("%s", t("error.update_info_invalid_json", err))
 	}
 
 	// 2. Die gleichen Daten in das Struct einlesen, um mit bekannten Feldern typsicher zu arbeiten.
@@ -480,7 +476,7 @@ func setUpdateInfo(updateInfo *UpdateInfo, allData map[string]interface{}, updat
 
 	// Neue Datei schreiben
 	if err := os.WriteFile(updateInfoPath, updatedData, 0644); err != nil {
-		return fmt.Errorf("update_info.json konnte nicht geschrieben werden: %v", err)
+		return fmt.Errorf(t("error.update_info_write_file", err))
 	}
 
 	logAndPrint(t("log.update_info_updated", updateInfo.Version))
@@ -733,7 +729,7 @@ func parseRemotePath(downloadURL string, basedir string) (string, error) {
 		return "", fmt.Errorf(t("error.url_ends_directory", downloadURL))
 	}
 	pos := strings.LastIndex(path, "/")
-	if pos <= 0 {
+	if pos < 0 {
 		return "", fmt.Errorf(t("error.url_no_filename", downloadURL))
 	} else {
 		path = path[:pos]

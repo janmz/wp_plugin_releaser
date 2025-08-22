@@ -36,12 +36,15 @@
   "error.json_mix": "Error mixing JSON data: %v",
   "error.json_final": "Error creating final JSON data: %v",
   "error.backup_create": "Error creating backup for update_info.json: %v",
+  "error.zip_version_remove": "Error: Could not remove version number from ZIP file name",
+  "error.php_read_file": "Could not read PHP file: %v",
+  "error.update_info_write_file": "Could not write update_info.json: %v",
   
-  "config.hardware_id_failed": "Config: Hardware ID cannot be determined",
-  "config.default_error": "Error reading default version of config file: %v",
-  "config.default_unsupported": "Unsupported type for default value: %v",
-  "config.decrypt_failed": "Failed to decrypt %s password: %v",
-  
+  "test.app.name": "Testing i18n for sconfig",
+  "test.app.version": "Version %s from %s",
+  "test.app.working_directory": "Working directory is '%s'",
+  "test.error.no_directory": "Folder '%s' does not exist.",
+
   "log.processing_php": "Processing PHP file: %s",
   "log.version_comment_found": "Version found in plugin comment: %s",
   "log.version_class_found": "Version found in class property: %s",
@@ -85,5 +88,6 @@
   "log.upload_completed": "Upload completed successfully",
   "log.current_version_detected": "Current version detected: %s",
   "log.update_info_version_updated": "update_info.json version updated to: %s",
-  "log.download_url_set": "Download URL set to '%s'!"
+  "log.download_url_set": "Download URL set to '%s'!",
+  "log.zip_file_created": "ZIP file created: %s"
 }
