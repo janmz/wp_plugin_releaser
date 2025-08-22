@@ -1,13 +1,14 @@
-# Makefile für wp_plugin_release mit i18n Support
+# Makefile for wp_plugin_release - this is NOT in use and NOT tested
 # 
-# Unterstützte Targets:
-# - build: Standard Build
-# - build-all: Build für alle Plattformen
-# - test: Tests ausführen  
-# - clean: Build-Artefakte löschen
-# - i18n-extract: Übersetzungskeys extrahieren
-# - i18n-update: Übersetzungen aktualisieren
-# - release: Release erstellen
+# Supported targets:
+# - build: Standard build
+# - build-all: Build for all platforms
+# - test: Run tests  
+# - clean: Remove build artifacts
+# - i18n-extract: Extract translation keys
+# - i18n-update: Update translations
+# - release: Create release
+
 
 # Variablen
 BINARY_NAME=wp_plugin_release
