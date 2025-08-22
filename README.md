@@ -16,7 +16,7 @@ A lightweight Go tool for **automated WordPress plugin releases** with full inte
 - Optional automatic SSH upload to update server
 - **Multi-language support (German/English) with automatic language detection**
 
-## 🌍 Internationalization
+## Internationalization
 
 This tool supports multiple languages:
 
@@ -35,7 +35,7 @@ LANG=de_DE.UTF-8 wp_plugin_release /path/to/plugin
 LANG=en_US.UTF-8 wp_plugin_release /path/to/plugin
 ```
 
-## ✨ Features
+## Features
 
 - **Automatic version detection** (from plugin comment or class variable)
 - **Update info management** (`update_info.json`)
@@ -46,26 +46,30 @@ LANG=en_US.UTF-8 wp_plugin_release /path/to/plugin
 - **Multi-language support** with automatic detection
 - **Plugin-update-checker** integration for [YahnisElsts](https://github.com/YahnisElsts/plugin-update-checker)
 
-## 📦 Installation
+## Installation
 
 ### Binary Download
+
 Download the latest release for your platform: [Releases](https://github.com/janmz/wp_plugin_release/releases)
 
 ### Go Install
+
 ```bash
 go install github.com/janmz/wp_plugin_release@latest
 ```
 
 ### Build from Source
+
 ```bash
 git clone https://github.com/janmz/wp_plugin_release.git
 cd wp_plugin_release
 make build
 ```
 
-## 🚀 Usage
+## Usage
 
 ### Basic Usage
+
 ```bash
 wp_plugin_release /path/to/plugin
 ```
@@ -73,7 +77,7 @@ wp_plugin_release /path/to/plugin
 - If no path is specified, the current directory is used
 - Expects an `update.config` file in the working directory
 
-## ⚙️ Configuration
+## Configuration
 
 ### `update.config` Example
 
@@ -97,28 +101,30 @@ wp_plugin_release /path/to/plugin
 |-------|-------------|----------|
 | `main_php_file` | Main PHP file of the plugin | ✅ |
 | `skip_pattern` | Files/directories to exclude from ZIP | ❌ |
-| `ssh_host` | SSH hostname for upload | ❌ |
-| `ssh_port` | SSH port (default: 22) | ❌ |
-| `ssh_dir_base` | Base directory on server | ❌ |
-| `ssh_user` | SSH username | ❌ |
+| `ssh_host` | SSH hostname for upload | ✅ |
+| `ssh_port` | SSH port (default: 22) | ✅ |
+| `ssh_dir_base` | Base directory on server | ✅ |
+| `ssh_user` | SSH username | ✅ |
 | `ssh_key_file` | Path to SSH private key | ❌ |
-| `ssh_password` | SSH password (encrypted after first use) | ❌ |
+| `ssh_password` | SSH password (encrypted after first use) | ✅ |
 
-## 🔒 Security Features
+## Security Features
 
 - **Hardware-bound encryption**: Passwords are encrypted with a key derived from your system's hardware
 - **Automatic password encryption**: Plain text passwords are automatically encrypted after first use
 - **Secure file handling**: Backup files are created before modifications
 - **SSH key authentication**: Supports both key and password authentication
 
-## 🏗️ Development
+## Development
 
 ### Setup Development Environment
+
 ```bash
 make setup
 ```
 
 ### Build
+
 ```bash
 # Standard build
 make build
@@ -129,6 +135,7 @@ make build-all
 ```
 
 ### Testing
+
 ```bash
 # Run tests
 make test
@@ -143,17 +150,20 @@ make i18n-validate
 ### Internationalization Development
 
 #### Extract Translation Keys
+
 ```bash
 make i18n-extract
 ```
 
 #### Add New Language
+
 1. Create `locales/[lang_code].json` (e.g., `locales/fr.json`)
 2. Copy structure from `locales/en.json`
 3. Translate all values
 4. Test with `LANG=[lang_code] wp_plugin_release --help`
 
 #### Translation File Structure
+
 ```json
 {
   "app.name": "WordPress Plugin Release Tool",
@@ -163,40 +173,46 @@ make i18n-extract
 }
 ```
 
-## 📝 Release Workflow
+## Release Workflow
 
 ### Automated Release
+
 1. **Tag**: `git tag v1.0.0` → `git push origin v1.0.0`
 2. **GitHub Actions** builds binaries for Linux/macOS/Windows and creates release with assets
 
 ### Manual Release
+
 ```bash
 make release
 ```
 
-## 📋 Requirements
+## Requirements
 
 ### Runtime
+
 - No dependencies (static binary)
 - Optional: SSH client for uploads
 
-### Development
+### Development Environment
+
 - Go 1.21+
 - Make (for build automation)
 - Git
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome! Please check `CONTRIBUTING.md` before creating a pull request.
 
 ### Translation Contributions
+
 We especially welcome contributions for additional languages:
+
 1. Fork the repository
 2. Add your language file in `locales/[lang_code].json`
 3. Test the translation
 4. Submit a pull request
 
-## 📄 License
+## License
 
 This software is under a modified MIT license (see `LICENSE`).
 You may freely use, modify, and distribute the code, **provided** you credit the original author
@@ -204,33 +220,35 @@ You may freely use, modify, and distribute the code, **provided** you credit the
 
 **No warranty** is provided.
 
-## 💖 Support
+## Support
 
-If you find this project helpful, please support **CFI-Kinderhilfe**: https://cfi-kinderhilfe.de/jetzt-spenden?q=VAYAWPR
+If you find this project helpful, please support **CFI-Kinderhilfe**: [https://cfi-kinderhilfe.de/jetzt-spenden?q=VAYAWPR]
 (Donations go to CFI-Kinderhilfe, not the author.)
 
-## 📞 Contact
+## Contact
 
 **Author**: Jan Neuhaus – VAYA Consulting  
-**Website**: https://vaya-consulting.de/development?q=GITHUB  
-**Repository**: https://github.com/janmz/wp_plugin_release
+**Website**: [https://vaya-consulting.de/development?q=GITHUB]  
+**Repository**: [https://github.com/janmz/wp_plugin_release]
 
-## 📚 Additional Resources
+## Additional Resources
 
 - [Plugin Update Checker by YahnisElsts](https://github.com/YahnisElsts/plugin-update-checker)
 - [WordPress Plugin Development Handbook](https://developer.wordpress.org/plugins/)
 
-## 🔄 Changelog
+## Changelog
 
 ### v1.1.0 (Current)
-- ✨ Full internationalization support (German/English)
-- ✨ Automatic language detection
-- ✨ Enhanced CI/CD pipeline
-- ✨ Improved error handling and logging
-- 🐛 Various bug fixes and improvements
+
+- Full internationalization support (German/English)
+- Automatic language detection
+- Enhanced CI/CD pipeline
+- Improved error handling and logging
+- Various bug fixes and improvements
 
 ### v1.0.0
-- 🎉 Initial release
-- ✅ Basic plugin release functionality
-- ✅ SSH upload support
-- ✅ Hardware-bound encryption
+
+- Initial release
+- Basic plugin release functionality
+- SSH upload support
+- Hardware-bound encryption

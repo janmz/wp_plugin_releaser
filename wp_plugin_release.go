@@ -1,28 +1,27 @@
 package main
 
 /*
- * wp_plugin_release: Ein Werkzeug, um Updates für Plugins auf einem eigenen Server zu aktualisieren.
+ * wp_plugin_release: A tool to update plugins on your own server.
  *
- * Es wird die Datei update_info.json aus einem Updates-Verzeichnis ausgewertet und entsprechend
- * die Hauptdatei angepasst und dort die Version ausgelesen, die update_info.json angepasst, die
- * ZIP-Datei erstellt und unter Updates bereitgestellt und die beiden Dateien dann auf dem
- * Webserver abgelegt.
+ * It evaluates the file update_info.json from an updates directory and adjusts
+ * the main file accordingly, reads the version from there, modifies update_info.json,
+ * creates the ZIP file, makes it available under Updates, and then places both files
+ * on the web server.
  *
- * Abhängigkeiten:
- * config.go: Einlesen der Config-Datei mit sicheren Passwörtern
- * hardware-id.go: Bestimmung einer eindeutigen System-ID für die Schlüssel von config.go
- * i18n.go: Internationalisierung der Ausgaben und Fehlermeldungen
+ * Dependencies:
+ * sconfig.go: Reading the config file with secure passwords
+ * i18n.go: Internationalization of outputs and error messages
  *
- * Version: In Datei version.go!
+ * Version: In file version.go!
  *
- * Autor: Jan Neuhaus, VAYA Consulting, https://vaya-consultig.de/development/ https://github.com/janmz
+ * Author: Jan Neuhaus, VAYA Consulting, https://vaya-consultig.de/development/ https://github.com/janmz
  *
- * Repository: Https://github.com/janmz/wp_plugin_releaser
+ * Repository: https://github.com/janmz/wp_plugin_releaser
  *
  * Change_log:
- * 17.8.2025	Internationalisierung hinzugefügt
- * 12.8.2025	Über github bereitgestellt
- * 8.8.2025		Erste Version erstellt und getestet
+ * 17.8.2025  Internationalization added
+ * 12.8.2025  Provided via GitHub
+ * 8.8.2025   First version created and tested
  *
  * (c)2025 Jan Neuhaus, VAYA Consulting
  *
@@ -476,7 +475,7 @@ func setUpdateInfo(updateInfo *UpdateInfo, allData map[string]interface{}, updat
 
 	// Neue Datei schreiben
 	if err := os.WriteFile(updateInfoPath, updatedData, 0644); err != nil {
-		return fmt.Errorf(t("error.update_info_write_file", err))
+		return fmt.Errorf("%s", t("error.update_info_write_file", err))
 	}
 
 	logAndPrint(t("log.update_info_updated", updateInfo.Version))
@@ -618,7 +617,7 @@ func uploadFiles(config *ConfigType, zipPath, updateInfoPath string, workDir str
 	}
 
 	if len(authMethods) == 0 {
-		return fmt.Errorf(t("error.ssh_no_auth"))
+		return fmt.Errorf("%s", t("error.ssh_no_auth"))
 	}
 
 	// Setup SSH config
@@ -726,11 +725,11 @@ func parseRemotePath(downloadURL string, basedir string) (string, error) {
 		path = "/" + path
 	}
 	if strings.HasSuffix(path, "/") {
-		return "", fmt.Errorf(t("error.url_ends_directory", downloadURL))
+		return "", fmt.Errorf("%s", t("error.url_ends_directory", downloadURL))
 	}
 	pos := strings.LastIndex(path, "/")
 	if pos < 0 {
-		return "", fmt.Errorf(t("error.url_no_filename", downloadURL))
+		return "", fmt.Errorf("%s", t("error.url_no_filename", downloadURL))
 	} else {
 		path = path[:pos]
 	}

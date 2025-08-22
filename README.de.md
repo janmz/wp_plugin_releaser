@@ -19,7 +19,7 @@ Ein leichtgewichtiges Go-Tool, um **neue Releases für WordPress-Plugins** autom
 - **ZIP-Erstellung** mit Skip-Patterns
 - **SSH-Upload** (Key- oder Passwort-basiert)
 - **Logdatei** mit allen Schritten
-- **Plugin-update-checker** von YahnisElsts wird verwendet (https://github.com/YahnisElsts/plugin-update-checker) sp lömmem Plugin-Updates einfach über den eigenen Webserver verteilt werden..
+- **Plugin-update-checker** von YahnisElsts wird verwendet ([https://github.com/YahnisElsts/plugin-update-checker]) sp lömmem Plugin-Updates einfach über den eigenen Webserver verteilt werden..
 
 ## Installation
 
@@ -69,7 +69,7 @@ Es wird **keinerlei Gewährleistung** übernommen.
 
 ## Spenden
 
-Wenn Ihnen das Projekt gefällt, unterstützten Sie bitte die **CFI-Kinderhilfe**: https://cfi-kinderhilfe.de/jetzt-spenden?q=VAYAWPR
+Wenn Ihnen das Projekt gefällt, unterstützten Sie bitte die **CFI-Kinderhilfe**: [https://cfi-kinderhilfe.de/jetzt-spenden?q=VAYAWPR]
 (Spenden gehen an die CFI-Kinderhilfe, nicht an den Autor.)
 
 ## Contributing
@@ -78,4 +78,4 @@ Beiträge sind willkommen! Bitte schaue dir `CONTRIBUTING.md` an, bevor du einen
 
 ## Kontakt
 
-Author: Jan Neuhaus — VAYA Consulting / https://vaya-consulting.de/development?q=GITHUB
+Author: Jan Neuhaus — VAYA Consulting / [https://vaya-consulting.de/development?q=GITHUB]

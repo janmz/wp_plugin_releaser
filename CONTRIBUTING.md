@@ -7,6 +7,7 @@ Thank you for your interest in contributing to wp_plugin_release! This document 
 ## Translation Contributions
 
 We especially welcome translation contributions! Currently supported languages:
+
 - English (en)
 - German (de)
 
@@ -14,14 +15,18 @@ We especially welcome translation contributions! Currently supported languages:
 
 1. **Fork the repository**
 2. **Create a new translation file**:
+
    ```bash
    cp locales/en.json locales/[your_lang_code].json
    ```
+
 3. **Translate all entries** in your language file
 4. **Test the translation**:
+
    ```bash
    LANG=[your_lang_code] ./bin/wp_plugin_release --help
    ```
+
 5. **Submit a pull request** with:
    - Your translation file
    - Updated README with your language listed
@@ -46,7 +51,8 @@ We especially welcome translation contributions! Currently supported languages:
 }
 ```
 
-**Important**: 
+**Important**:
+
 - Keep format specifiers (`%s`, `%v`) in the same position
 - Don't translate keys (left side), only values (right side)
 - Maintain JSON syntax validity
@@ -56,6 +62,7 @@ We especially welcome translation contributions! Currently supported languages:
 ### Development Setup
 
 1. **Fork and clone**:
+
    ```bash
    git clone https://github.com/your-username/wp_plugin_release.git
    cd wp_plugin_release
@@ -64,6 +71,7 @@ We especially welcome translation contributions! Currently supported languages:
 ### Making Changes
 
 1. **Create a feature branch**:
+
    ```bash
    git checkout -b feature/your-feature-name
    ```
@@ -75,11 +83,13 @@ We especially welcome translation contributions! Currently supported languages:
    - Add tests for new functionality
 
 3. **Test your changes**:
+
    ```bash
    go test -v
    ```
 
 4. **Run linters**:
+
    ```bash
    go vet -v
    ```
@@ -89,6 +99,7 @@ We especially welcome translation contributions! Currently supported languages:
 #### Internationalization
 
 - **All user-facing strings** must use the `t()` function:
+
   ```go
   // Good
   logAndPrint(t("log.processing_php", phpFilePath))
@@ -100,7 +111,8 @@ We especially welcome translation contributions! Currently supported languages:
 - **Add translation keys** to both `locales/en.json` and `locales/de.json`
 
 - **Use descriptive key names** with categories:
-  ```
+
+  ```text
   app.* - Application messages
   error.* - Error messages
   log.* - Log messages
@@ -139,12 +151,14 @@ make test-i18n
 ### Submitting Changes
 
 1. **Commit your changes**:
+
    ```bash
    git add .
    git commit -m "feat: add support for French translation"
    ```
 
 2. **Push to your fork**:
+
    ```bash
    git push origin feature/your-feature-name
    ```
@@ -159,7 +173,7 @@ make test-i18n
 
 We follow [Conventional Commits](https://www.conventionalcommits.org/):
 
-```
+```text
 <type>(<scope>): <description>
 
 [optional body]
@@ -180,7 +194,7 @@ We follow [Conventional Commits](https://www.conventionalcommits.org/):
 
 ### Examples
 
-```
+```text
 feat(i18n): add French translation support
 fix(config): handle missing config file gracefully
 docs: update installation instructions
@@ -195,7 +209,7 @@ When reporting bugs, please include:
    - Operating system
    - Go version
    - Language/locale settings
-   
+
 2. **Steps to reproduce**
 
 3. **Expected vs actual behavior**
@@ -234,6 +248,7 @@ For feature requests:
 ## Checklist for Contributors
 
 ### For Code Changes
+
 - [ ] Code follows project conventions
 - [ ] All user-facing strings use `t()` function
 - [ ] Translation keys added to all language files
@@ -243,6 +258,7 @@ For feature requests:
 - [ ] Documentation updated if needed
 
 ### For Translation Changes
+
 - [ ] Translation file is valid JSON
 - [ ] All keys from English version are translated
 - [ ] Format specifiers preserved correctly
@@ -260,7 +276,7 @@ For feature requests:
 
 - **Issues**: GitHub Issues for bugs and feature requests
 - **Discussions**: GitHub Discussions for questions
-- **Email**: security@vaya-consulting.de for security issues
+- **Email**: [security@vaya-consulting.de] for security issues
 
 ## License
 
