@@ -56,15 +56,6 @@ Download the latest release for your platform: [Releases](https://github.com/jan
 go install github.com/janmz/wp_plugin_release@latest
 ```
 
-### Docker
-```bash
-# Pull from GitHub Container Registry
-docker pull ghcr.io/janmz/wp_plugin_release:latest
-
-# Or build locally
-docker build -t wp_plugin_release .
-```
-
 ### Build from Source
 ```bash
 git clone https://github.com/janmz/wp_plugin_release.git
@@ -81,21 +72,6 @@ wp_plugin_release /path/to/plugin
 
 - If no path is specified, the current directory is used
 - Expects an `update.config` file in the working directory
-
-### Docker Usage
-```bash
-# Mount current directory and run
-docker run --rm -v $(pwd):/workspace wp_plugin_release:latest /workspace
-
-# With German localization
-docker run --rm -e LANG=de_DE.UTF-8 -v $(pwd):/workspace wp_plugin_release:latest /workspace
-
-# With SSH keys for upload
-docker run --rm \
-  -v $(pwd):/workspace \
-  -v ~/.ssh:/home/wp_release_user/.ssh:ro \
-  wp_plugin_release:latest /workspace
-```
 
 ## ⚙️ Configuration
 
@@ -150,8 +126,6 @@ make build
 # Build for all platforms
 make build-all
 
-# Build with Docker
-make docker
 ```
 
 ### Testing
@@ -194,7 +168,6 @@ make i18n-extract
 ### Automated Release
 1. **Tag**: `git tag v1.0.0` → `git push origin v1.0.0`
 2. **GitHub Actions** builds binaries for Linux/macOS/Windows and creates release with assets
-3. **Docker images** are automatically built and pushed to GitHub Container Registry
 
 ### Manual Release
 ```bash
@@ -210,20 +183,7 @@ make release
 ### Development
 - Go 1.21+
 - Make (for build automation)
-- Docker (optional)
 - Git
-
-## 🐳 Docker Support
-
-### Supported Platforms
-- `linux/amd64`
-- `linux/arm64`
-
-### Environment Variables
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `LANG` | Language locale | `en_US.UTF-8` |
-| `WP_PLUGIN_RELEASE_LOCALES_PATH` | Path to translation files | `/usr/local/share/wp_plugin_release/locales` |
 
 ## 🤝 Contributing
 
@@ -259,14 +219,12 @@ If you find this project helpful, please support **CFI-Kinderhilfe**: https://cf
 
 - [Plugin Update Checker by YahnisElsts](https://github.com/YahnisElsts/plugin-update-checker)
 - [WordPress Plugin Development Handbook](https://developer.wordpress.org/plugins/)
-- [Semantic Versioning](https://semver.org/)
 
 ## 🔄 Changelog
 
 ### v1.1.0 (Current)
 - ✨ Full internationalization support (German/English)
 - ✨ Automatic language detection
-- ✨ Docker support with multi-arch builds
 - ✨ Enhanced CI/CD pipeline
 - ✨ Improved error handling and logging
 - 🐛 Various bug fixes and improvements
