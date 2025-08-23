@@ -10,8 +10,9 @@ on:
     branches: [ main ]
 
 env:
-  GO_VERSION: '1.21'
-
+  GO_VERSION: '1.23'
+  GOTOOLCHAIN: auto
+  
 jobs:
   # Tests und Code-Qualität
   test:
@@ -127,6 +128,9 @@ jobs:
         BINARY_NAME="wp_plugin_release"
         if [ "$GOOS" = "windows" ]; then
           BINARY_NAME="${BINARY_NAME}.exe"
+        else
+          # Remove .syso-files that are used only for windows
+          find . -name "*.syso" -delete
         fi
         
         go build \
@@ -139,6 +143,9 @@ jobs:
         BINARY_NAME="wp_plugin_release"
         if [ "${{ matrix.goos }}" = "windows" ]; then
           BINARY_NAME="${BINARY_NAME}.exe"
+        else
+          # Remove .syso-files that are used only for windows
+          find . -name "*.syso" -delete
         fi
         
         PACKAGE_NAME="wp_plugin_release-${{ steps.version.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}"
@@ -243,12 +250,19 @@ jobs:
   security:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Run Gosec Security Scanner
-      uses: securego/gosec@v2.19.0
-      with:
-        args: './...'
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.x'
+
+      - name: Install gosec
+        run: go install github.com/securego/gosec/v2/cmd/gosec@latest
+      - name: Run gosec
+        uses: securego/gosec@latest
+        with:
+          args: ./...
 
   # Deployment (nur für bestimmte Branches/Tags)
   deploy-staging:
