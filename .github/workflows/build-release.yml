@@ -260,7 +260,7 @@ jobs:
       - name: Install gosec
         run: go install github.com/securego/gosec/v2/cmd/gosec@latest
       - name: Run gosec
-        uses: securego/gosec@latest
+        uses: securego/gosec@v2.19.0
         with:
           args: ./...
 
