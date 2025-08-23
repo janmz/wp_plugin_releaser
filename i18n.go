@@ -97,7 +97,7 @@ func loadExternalTranslations() {
 	}
 
 	for _, file := range files {
-		data, err := os.ReadFile(file)
+		data, err := os.ReadFile(file) // # nosec G304
 		if err != nil {
 			continue
 		}

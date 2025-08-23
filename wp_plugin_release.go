@@ -203,7 +203,7 @@ func main() {
 func initLogging(workDir string) {
 	logPath := filepath.Join(workDir, "update.log")
 	var err error
-	logFile, err = os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	logFile, err = os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600) // # nosec G304
 	if err != nil {
 		fmt.Printf(t("error.log_file", err) + "\n")
 		os.Exit(1)
@@ -220,7 +220,7 @@ func processMainPHPFile(workDir, mainPHPFile string, updateInfo *UpdateInfo) (st
 	phpFilePath := filepath.Join(workDir, mainPHPFile)
 	logAndPrint(t("log.processing_php", phpFilePath))
 
-	content, err := os.ReadFile(phpFilePath)
+	content, err := os.ReadFile(phpFilePath) // # nosec G304
 	if err != nil {
 		return "", fmt.Errorf("%s", t("error.php_read_file", err))
 	}
@@ -326,7 +326,7 @@ func processMainPHPFile(workDir, mainPHPFile string, updateInfo *UpdateInfo) (st
 	if err != nil {
 		return "", fmt.Errorf(t("error.rename_file"), err)
 	}
-	err = os.WriteFile(phpFilePath, []byte(contentStr), 0644)
+	err = os.WriteFile(phpFilePath, []byte(contentStr), 0600)
 	if err != nil {
 		return "", fmt.Errorf(t("error.write_php"), err)
 	}
@@ -405,7 +405,7 @@ func getUpdateInfo(updateInfoPath string) (*UpdateInfo, map[string]interface{}, 
 		return nil, nil, fmt.Errorf("%s", t("error.update_info_missing"))
 	}
 
-	data, err := os.ReadFile(updateInfoPath)
+	data, err := os.ReadFile(updateInfoPath) // # nosec G304
 	if err != nil {
 		return nil, nil, fmt.Errorf("%s", t("error.update_info_read_file", err))
 	}
@@ -474,7 +474,7 @@ func setUpdateInfo(updateInfo *UpdateInfo, allData map[string]interface{}, updat
 	logAndPrint(t("log.update_info_backup", backupFilePath))
 
 	// Neue Datei schreiben
-	if err := os.WriteFile(updateInfoPath, updatedData, 0644); err != nil {
+	if err := os.WriteFile(updateInfoPath, updatedData, 0600); err != nil {
 		return fmt.Errorf("%s", t("error.update_info_write_file", err))
 	}
 
@@ -487,7 +487,7 @@ func createZipFile(sourceDir, zipPath string, skipPatterns []string, slug string
 
 	logAndPrint(t("log.creating_zip", zipPath))
 
-	zipFile, err := os.Create(zipPath)
+	zipFile, err := os.Create(zipPath) // # nosec G304
 	if err != nil {
 		return fmt.Errorf(t("error.zip_create"), err)
 	}
@@ -546,7 +546,7 @@ func createZipFile(sourceDir, zipPath string, skipPatterns []string, slug string
 			return err
 		}
 
-		fileContent, err := os.Open(path)
+		fileContent, err := os.Open(path) // # nosec G304
 		if err != nil {
 			return err
 		}
@@ -620,11 +620,11 @@ func uploadFiles(config *ConfigType, zipPath, updateInfoPath string, workDir str
 		return fmt.Errorf("%s", t("error.ssh_no_auth"))
 	}
 
-	// Setup SSH config
+	// Setup SSH config ==> TODO include the HostKey-check and a workflow to get it!
 	sshConfig := &ssh.ClientConfig{
 		User:            config.SSHUser,
 		Auth:            authMethods,
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // #nosec G106
 		Timeout:         30 * time.Second,
 	}
 
@@ -766,7 +766,7 @@ func uploadFileViaSFTP(client *ssh.Client, localPath, remotePath string) error {
 	defer session.Close()
 
 	// Open local file
-	localFile, err := os.Open(localPath)
+	localFile, err := os.Open(localPath) // # nosec G304
 	if err != nil {
 		return err
 	}
@@ -791,7 +791,10 @@ func uploadFileViaSFTP(client *ssh.Client, localPath, remotePath string) error {
 	// Copy file content
 	_, err = io.Copy(stdin, localFile)
 	if err != nil {
-		stdin.Close()
+		err2 := stdin.Close()
+		if err2 != nil {
+			return fmt.Errorf("failed to close stdin: %w; original error: %v", err2, err)
+		}
 		return err
 	}
 
