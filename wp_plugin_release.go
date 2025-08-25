@@ -256,18 +256,18 @@ func processMainPHPFile(workDir, mainPHPFile string, updateInfo *UpdateInfo) (st
 	}
 
 	// Update both versions to current version
-	if commentVersion != "" && commentVersion != currentVersion {
-		if len(commentMatch) == 4 {
-			contentStr = contentStr[:commentMatch[2]] + currentVersion + contentStr[commentMatch[3]:]
-		}
-		logAndPrint(t("log.version_comment_updated", currentVersion))
-	}
-
 	if classVersion != "" && classVersion != currentVersion {
 		if len(classMatch) == 4 {
 			contentStr = contentStr[:classMatch[2]] + currentVersion + contentStr[classMatch[3]:]
 		}
 		logAndPrint(t("log.version_class_updated", currentVersion))
+	}
+
+	if commentVersion != "" && commentVersion != currentVersion {
+		if len(commentMatch) == 4 {
+			contentStr = contentStr[:commentMatch[2]] + currentVersion + contentStr[commentMatch[3]:]
+		}
+		logAndPrint(t("log.version_comment_updated", currentVersion))
 	}
 
 	// Update Last-Update comment
