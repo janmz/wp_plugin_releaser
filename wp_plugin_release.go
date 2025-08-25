@@ -228,22 +228,22 @@ func processMainPHPFile(workDir, mainPHPFile string, updateInfo *UpdateInfo) (st
 	contentStr := string(content)
 
 	// Extract version from plugin comment
-	commentVersionRegex := regexp.MustCompile(`(?i)\*\s*Version:\s*([0-9]+\.[0-9]+(?:\.[0-9]+)?)`)
-	commentMatch := commentVersionRegex.FindStringSubmatch(contentStr)
+	commentVersionRegex := regexp.MustCompile(`(?is)(?:/\*.*?\bVersion:\s*|//\s*Version:\s*)([0-9]+\.[0-9]+(?:\.[0-9]+)?)`)
+	commentMatch := commentVersionRegex.FindStringSubmatchIndex(contentStr)
 
 	var commentVersion string
-	if len(commentMatch) > 1 {
-		commentVersion = commentMatch[1]
+	if len(commentMatch) == 4 {
+		commentVersion = contentStr[commentMatch[2]:commentMatch[3]]
 		logAndPrint(t("log.version_comment_found", commentVersion))
 	}
 
 	// Extract version from class property
 	classVersionRegex := regexp.MustCompile(`private\s+\$version\s*=\s*['"]+([0-9]+\.[0-9]+(?:\.[0-9]+)?)['"]+`)
-	classMatch := classVersionRegex.FindStringSubmatch(contentStr)
+	classMatch := classVersionRegex.FindStringSubmatchIndex(contentStr)
 
 	var classVersion string
-	if len(classMatch) > 1 {
-		classVersion = classMatch[1]
+	if len(classMatch) == 4 {
+		classVersion = contentStr[classMatch[2]:classMatch[3]]
 		logAndPrint(t("log.version_class_found", classVersion))
 	}
 
@@ -257,27 +257,37 @@ func processMainPHPFile(workDir, mainPHPFile string, updateInfo *UpdateInfo) (st
 
 	// Update both versions to current version
 	if commentVersion != "" && commentVersion != currentVersion {
-		contentStr = commentVersionRegex.ReplaceAllString(contentStr, fmt.Sprintf("* Version: %s", currentVersion))
+		if len(commentMatch) == 4 {
+			contentStr = contentStr[:commentMatch[2]] + currentVersion + contentStr[commentMatch[3]:]
+		}
 		logAndPrint(t("log.version_comment_updated", currentVersion))
 	}
 
 	if classVersion != "" && classVersion != currentVersion {
-		contentStr = classVersionRegex.ReplaceAllString(contentStr, fmt.Sprintf("private $$version = '%s'", currentVersion))
+		if len(classMatch) == 4 {
+			contentStr = contentStr[:classMatch[2]] + currentVersion + contentStr[classMatch[3]:]
+		}
 		logAndPrint(t("log.version_class_updated", currentVersion))
 	}
 
 	// Update Last-Update comment
 	currentDate := time.Now().Format("2006-01-02 15:04:05")
-	lastUpdateRegex := regexp.MustCompile(`(?i)\*\s*Last-Update:\s*[0-9]{4}-[0-9]{2}-[0-9]{2}( [0-9]{2}:[0-9]{2}(:[0-9]{2})?)?`)
+	lastUpdateRegex := regexp.MustCompile(`(?is)(?:/\*.*?\bLast-Update:\s*|//\s*Last-Update:\s*)([0-9]{4}-[0-9]{2}-[0-9]{2}( [0-9]{2}:[0-9]{2}(:[0-9]{2})?)?)`)
+	lastUpdateMatch := lastUpdateRegex.FindStringSubmatchIndex(contentStr)
 
-	if lastUpdateRegex.MatchString(contentStr) {
-		contentStr = lastUpdateRegex.ReplaceAllString(contentStr, fmt.Sprintf("* Last-Update: %s", currentDate))
+	if len(lastUpdateMatch) == 4 {
+		contentStr = contentStr[:lastUpdateMatch[2]] + currentDate + contentStr[lastUpdateMatch[3]:]
 		logAndPrint(t("log.last_update_updated", currentDate))
 	} else {
 		// Add Last-Update comment after Version line
-		versionLineRegex := regexp.MustCompile(`(\*\s*Version:\s*[0-9]+\.[0-9]+(?:\.[0-9]+)?\s*\n)`)
-		if versionLineRegex.MatchString(contentStr) {
-			contentStr = versionLineRegex.ReplaceAllString(contentStr, fmt.Sprintf("$1 * Last-Update: %s\n", currentDate))
+		commentVersionRegex = regexp.MustCompile(`(?is)(?:/\*.*?|//\s*)(\bVersion:\s*[0-9]+\.[0-9]+(?:\.[0-9]+)?)`)
+		commentMatch := commentVersionRegex.FindStringSubmatchIndex(contentStr)
+		if len(commentMatch) == 4 {
+			posBeforeVersion := commentMatch[2]
+			for posBeforeVersion > 0 && contentStr[posBeforeVersion] != '\n' {
+				posBeforeVersion--
+			}
+			contentStr = contentStr[:commentMatch[1]] + contentStr[posBeforeVersion:commentMatch[2]] + fmt.Sprintf("Last-Update: %s\n", currentDate) + contentStr[commentMatch[1]:]
 			logAndPrint(t("log.last_update_added", currentDate))
 		}
 	}

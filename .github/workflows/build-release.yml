@@ -128,6 +128,9 @@ jobs:
         BINARY_NAME="wp_plugin_release"
         if [ "$GOOS" = "windows" ]; then
           BINARY_NAME="${BINARY_NAME}.exe"
+          if ["${{ matrix.goarch }}" = "arm64" ]; then
+            find . -name "*.syso" -delete
+          fi
         else
           # Remove .syso-files that are used only for windows
           find . -name "*.syso" -delete
@@ -143,6 +146,9 @@ jobs:
         BINARY_NAME="wp_plugin_release"
         if [ "${{ matrix.goos }}" = "windows" ]; then
           BINARY_NAME="${BINARY_NAME}.exe"
+          if ["${{ matrix.goarch }}" = "arm64" ]; then
+            find . -name "*.syso" -delete
+          fi
         else
           # Remove .syso-files that are used only for windows
           find . -name "*.syso" -delete
