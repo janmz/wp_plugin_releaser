@@ -275,7 +275,7 @@ func processMainPHPFile(workDir, mainPHPFile string, updateInfo *UpdateInfo) (st
 	lastUpdateRegex := regexp.MustCompile(`(?is)(?:/\*.*?\bLast-Update:\s*|//\s*Last-Update:\s*)([0-9]{4}-[0-9]{2}-[0-9]{2}( [0-9]{2}:[0-9]{2}(:[0-9]{2})?)?)`)
 	lastUpdateMatch := lastUpdateRegex.FindStringSubmatchIndex(contentStr)
 
-	if len(lastUpdateMatch) == 4 {
+	if len(lastUpdateMatch) >= 4 {
 		contentStr = contentStr[:lastUpdateMatch[2]] + currentDate + contentStr[lastUpdateMatch[3]:]
 		logAndPrint(t("log.last_update_updated", currentDate))
 	} else {
@@ -287,7 +287,7 @@ func processMainPHPFile(workDir, mainPHPFile string, updateInfo *UpdateInfo) (st
 			for posBeforeVersion > 0 && contentStr[posBeforeVersion] != '\n' {
 				posBeforeVersion--
 			}
-			contentStr = contentStr[:commentMatch[1]] + contentStr[posBeforeVersion:commentMatch[2]] + fmt.Sprintf("Last-Update: %s\n", currentDate) + contentStr[commentMatch[1]:]
+			contentStr = contentStr[:commentMatch[1]] + contentStr[posBeforeVersion:commentMatch[2]] + fmt.Sprintf("Last-Update: %s", currentDate) + contentStr[commentMatch[1]:]
 			logAndPrint(t("log.last_update_added", currentDate))
 		}
 	}
