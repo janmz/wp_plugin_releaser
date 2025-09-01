@@ -1,16 +1,14 @@
-# wp_plugin_release
+# wp_plugin_releaser
 
-![Go Version](https://img.shields.io/github/go-mod/go-version/janmz/wp_plugin_release)
-![Release](https://img.shields.io/github/v/release/janmz/wp_plugin_release)
-![License: MIT (modified)](https://img.shields.io/badge/License-MIT--Modified-blue.svg)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/janmz/wp_plugin_releaser)](https://golang.org)
+[![Release](https://img.shields.io/github/v/release/janmz/wp_plugin_releaser)](https://github.com/janmz/wp_plugin_releaser/releases)
+[![License: MIT (Modified)](https://img.shields.io/badge/License-MIT--Modified-blue.svg)](LICENSE)
 [![Support: CFI-Kinderhilfe](https://img.shields.io/badge/Support-CFI--Kinderhilfe-0077B6?logo=heart)](https://cfi-kinderhilfe.de/jetzt-spenden?q=VAYAWPR)
-[![Build Status](https://github.com/janmz/wp_plugin_release/workflows/Build%20and%20Release/badge.svg)](https://github.com/janmz/wp_plugin_release/actions)
+[![Build Status](https://github.com/janmz/wp_plugin_releaser/workflows/Build%20and%20Release/badge.svg)](https://github.com/janmz/wp_plugin_releaser/actions)
 
-*[🇩🇪 Deutsche Version](README.de.md) | 🇺🇸 English Version*
+*🌍 [🇩🇪 Deutsche Version](README.de.md) | 🇺🇸 English Version*
 
-A lightweight Go tool for **automated WordPress plugin releases** with full internationalization support, including:
-
-- Automatic version number updates in main PHP file
+**wp_plugin_releaser** is a lightweight Go tool for **automated WordPress plugin releases**, with full internationalization support, including:- Automatic version number updates in main PHP file
 - Update info management (`update_info.json`)
 - ZIP file creation with configurable exclusion patterns
 - Optional automatic SSH upload to update server
