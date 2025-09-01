@@ -6,7 +6,7 @@
 [![Unterstützung: CFI-Kinderhilfe](https://img.shields.io/badge/Unterstützung-CFI--Kinderhilfe-0077B6?logo=heart)](https://cfi-kinderhilfe.de/jetzt-spenden?q=VAYAWPR)
 [![Build Status](https://github.com/janmz/wp_plugin_releaser/workflows/Build%20and%20Release/badge.svg)](https://github.com/janmz/wp_plugin_releaser/actions)
 
-*🌍 [🇩🇪 Deutsche Version](README.de.md) | 🇺🇸 [English Version](README.md)*
+*🌍 🇩🇪 Deutsche Version | 🇺🇸 [English Version](README.md)*
 
 **wp_plugin_releaser** ist ein schlankes Go-Tool für die **automatisierte Veröffentlichung von WordPress-Plugins**.  
 Es bietet vollständige Internationalisierungsunterstützung und Funktionen wie:Ein leichtgewichtiges Go-Tool, um **neue Releases für WordPress-Plugins** automatisiert bereitzustellen – inklusive:
