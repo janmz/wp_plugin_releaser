@@ -1,11 +1,15 @@
-# wp_plugin_release
+# wp_plugin_releaser
 
-![Go Version](https://img.shields.io/github/go-mod/go-version/janmz/wp_plugin_release)
-![Release](https://img.shields.io/github/v/release/janmz/wp_plugin_release)
-![License: MIT (modified)](https://img.shields.io/badge/License-MIT--Modified-blue.svg)
-[![Support: CFI-Kinderhilfe](https://img.shields.io/badge/Support-CFI--Kinderhilfe-0077B6?logo=heart)](https://cfi-kinderhilfe.de/jetzt-spenden?q=VAYAWPR)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/janmz/wp_plugin_releaser)](https://golang.org)
+[![Release](https://img.shields.io/github/v/release/janmz/wp_plugin_releaser)](https://github.com/janmz/wp_plugin_releaser/releases)
+[![Lizenz: MIT (modifiziert)](https://img.shields.io/badge/Lizenz-MIT--Modified-blue.svg)](LICENSE)
+[![Unterstützung: CFI-Kinderhilfe](https://img.shields.io/badge/Unterstützung-CFI--Kinderhilfe-0077B6?logo=heart)](https://cfi-kinderhilfe.de/jetzt-spenden?q=VAYAWPR)
+[![Build Status](https://github.com/janmz/wp_plugin_releaser/workflows/Build%20and%20Release/badge.svg)](https://github.com/janmz/wp_plugin_releaser/actions)
 
-Ein leichtgewichtiges Go-Tool, um **neue Releases für WordPress-Plugins** automatisiert bereitzustellen – inklusive:
+*🌍 🇩🇪 Deutsche Version | 🇺🇸 [English Version](README.md)*
+
+**wp_plugin_releaser** ist ein schlankes Go-Tool für die **automatisierte Veröffentlichung von WordPress-Plugins**.  
+Es bietet vollständige Internationalisierungsunterstützung und Funktionen wie:Ein leichtgewichtiges Go-Tool, um **neue Releases für WordPress-Plugins** automatisiert bereitzustellen – inklusive:
 
 - Aktualisierung der Versionsnummer in der Haupt-PHP-Datei
 - Anpassung der `update_info.json`
