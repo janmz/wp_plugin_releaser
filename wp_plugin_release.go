@@ -292,7 +292,7 @@ func processMainPHPFile(workDir, mainPHPFile string, updateInfo *UpdateInfo) (st
 		}
 	}
 	// Check the Integration of PluginUpdateChecker
-	pucRegex := regexp.MustCompile(`(?s)PucFactory::buildUpdateChecker\(\s*'([^']*)'\s*,\s*__FILE__,\s*(//[^\n]*)?\s*'([-_a-zA-Z0-9]*)'\s*\)`)
+	pucRegex := regexp.MustCompile(`(?s)\$?[a-zA-Z0-9_]*::buildUpdateChecker\(\s*'([^']*)'\s*,\s*__FILE__,\s*(//[^\n]*)?\s*'([-_a-zA-Z0-9]*)'\s*\)`)
 	pucMatch := pucRegex.FindStringSubmatchIndex(contentStr)
 	newDownloadURL := strings.Replace(updateInfo.DownloadURL, filepath.Base(updateInfo.DownloadURL), "update_info.json", 1)
 	if len(pucMatch) != 8 {
@@ -513,6 +513,7 @@ func createZipFile(sourceDir, zipPath string, skipPatterns []string, slug string
 		"update.log",
 		"*.code-workspace",
 		"*.bak",
+		"composer.lock",
 		"Thumbs.db",
 	}
 

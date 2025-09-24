@@ -1,21 +1,21 @@
 IDI_ICON1 ICON "vaya.ico"
 
 1 VERSIONINFO
-FILEVERSION     1,1,2,22
-PRODUCTVERSION  1,1,2,22
+FILEVERSION     1,1,3,26
+PRODUCTVERSION  1,1,3,26
 BEGIN
   BLOCK "StringFileInfo"
   BEGIN
     BLOCK "040904E4"
     BEGIN
       VALUE "CompanyName", "VAYA Consulting"
-      VALUE "FileDescription", ""
-      VALUE "FileVersion", "1.1.2.22"
-      VALUE "InternalName", "janmz"
+      VALUE "FileDescription", "A tool to update plugins on your own server."
+      VALUE "FileVersion", "1.1.3.26"
+      VALUE "InternalName", "wp_plugin_release"
       VALUE "LegalCopyright", "Copyright (c)2025 VAYA Consulting"
-      VALUE "OriginalFilename", "janmz.exe"
-      VALUE "ProductName", "janmz"
-      VALUE "ProductVersion", "1.1.2.22"
+      VALUE "OriginalFilename", "wp_plugin_release.exe"
+      VALUE "ProductName", "wp_plugin_release"
+      VALUE "ProductVersion", "1.1.3.26"
     END
   END
   BLOCK "VarFileInfo"
