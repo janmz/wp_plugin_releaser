@@ -12,16 +12,18 @@ package main
  * sconfig.go: Reading the config file with secure passwords
  * i18n.go: Internationalization of outputs and error messages
  *
- * Version: In file version.go!
+ * Version: 1.2.0.28 (in version.go zu ändern)
  *
  * Author: Jan Neuhaus, VAYA Consulting, https://vaya-consultig.de/development/ https://github.com/janmz
  *
  * Repository: https://github.com/janmz/wp_plugin_releaser
  *
- * Change_log:
- * 17.8.2025  Internationalization added
- * 12.8.2025  Provided via GitHub
- * 8.8.2025   First version created and tested
+ * ChangeLog:
+ *  01.11.25	1.2.0	github integration, building of png from svg, check before upload
+ * 01.11.2025  	1.2.0	GitHub integration added
+ * 17.08.2025  	1.1.3	Internationalization and changelog added
+ * 12.08.2025  	1.1.0	Provided via GitHub
+ * 08.08.2025  	1.0.0	First version created and tested
  *
  * (c)2025 Jan Neuhaus, VAYA Consulting
  *
@@ -29,13 +31,16 @@ package main
 
 import (
 	"archive/zip"
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"html"
 	"io"
 	"log"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -123,9 +128,6 @@ func main() {
 	initLogging(workDir)
 	defer logFile.Close()
 
-	logAndPrint(t("app.version", Version, BuildTime))
-	logAndPrint(t("app.working_directory", workDir))
-
 	// Read config file
 	err := sconfig.LoadConfig(&config, 2, updateConfigPath, false)
 	if err != nil {
@@ -141,6 +143,10 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Display application name and version
+	appName := filepath.Base(os.Args[0])
+	logAndPrint(appName + " " + t("app.version", Version, BuildTime) + " " + t("app.working_directory", workDir))
+
 	// Read and update main PHP file
 	currentVersion, err := processMainPHPFile(workDir, config.MainPHPFile, updateInfo)
 	if err != nil {
@@ -155,6 +161,22 @@ func main() {
 	if err != nil {
 		logAndPrint(t("error.update_info_processing", err))
 		os.Exit(1)
+	}
+
+	// Process changelog
+	changelogText, err := processChangelog(workDir, currentVersion, updateInfo)
+	if err != nil {
+		logAndPrint(t("error.changelog_write", err))
+		// Don't exit, just continue without changelog
+	} else if changelogText != "" {
+		updateChangelogInUpdateInfo(updateInfo, changelogText)
+	}
+
+	// Check and convert SVG files if changed
+	err = processSVGFiles(workDir, updateInfo)
+	if err != nil {
+		logAndPrint(t("error.svg_convert", err))
+		// Don't exit, just continue
 	}
 	remoteZIPName := filepath.Base(updateInfo.DownloadURL)
 	re := regexp.MustCompile(`-v?[0-9.]*\.zip$`)
@@ -195,6 +217,11 @@ func main() {
 		}
 	} else {
 		logAndPrint(t("log.no_ssh_config"))
+	}
+
+	err = handleGitHubIntegration(workDir, updateInfo, zipPath)
+	if err != nil {
+		logAndPrint(t("error.github_check", err))
 	}
 
 	logAndPrint(t("app.release_process_completed"))
@@ -247,8 +274,21 @@ func processMainPHPFile(workDir, mainPHPFile string, updateInfo *UpdateInfo) (st
 		logAndPrint(t("log.version_class_found", classVersion))
 	}
 
-	// Determine current version (higher of both)
+	// Extract version from define() statement
+	defineVersionRegex := regexp.MustCompile(`define\s*\(\s*['"]([A-Z_]+)_VERSION['"]\s*,\s*['"]([0-9]+\.[0-9]+(?:\.[0-9]+)?)['"]\s*\)`)
+	defineMatch := defineVersionRegex.FindStringSubmatchIndex(contentStr)
+
+	var defineVersion string
+	var defineKey string
+	if len(defineMatch) >= 6 {
+		defineKey = contentStr[defineMatch[2]:defineMatch[3]]
+		defineVersion = contentStr[defineMatch[4]:defineMatch[5]]
+		logAndPrint(t("log.version_define_found", defineKey+"_VERSION", defineVersion))
+	}
+
+	// Determine current version (higher of all three)
 	currentVersion := getHigherVersion(commentVersion, classVersion)
+	currentVersion = getHigherVersion(currentVersion, defineVersion)
 	if currentVersion == "" {
 		return "", fmt.Errorf("%s", t("error.no_valid_version"))
 	} else {
@@ -268,6 +308,14 @@ func processMainPHPFile(workDir, mainPHPFile string, updateInfo *UpdateInfo) (st
 			contentStr = contentStr[:commentMatch[2]] + currentVersion + contentStr[commentMatch[3]:]
 		}
 		logAndPrint(t("log.version_comment_updated", currentVersion))
+	}
+
+	// Update define version if present
+	if defineVersion != "" && defineVersion != currentVersion {
+		if len(defineMatch) >= 6 {
+			contentStr = contentStr[:defineMatch[4]] + currentVersion + contentStr[defineMatch[5]:]
+			logAndPrint(t("log.version_define_updated", currentVersion))
+		}
 	}
 
 	// Update Last-Update comment
@@ -769,6 +817,23 @@ func uploadFileViaSFTP(client *ssh.Client, localPath, remotePath string) error {
 	remotePath = filepath.ToSlash(remotePath)
 	logAndPrint(t("log.uploading_file", localPath, remotePath))
 
+	// Check remote file modification time
+	localInfo, err := os.Stat(localPath)
+	if err != nil {
+		return err
+	}
+
+	remoteModTime, err := getRemoteFileModTime(client, remotePath)
+	if err == nil {
+		// Remote file exists, compare modification times
+		if !localInfo.ModTime().After(remoteModTime) {
+			// Local file is not newer, skip upload
+			logAndPrint(t("log.file_already_current", filepath.Base(localPath)))
+			return nil
+		}
+	}
+	// Remote file doesn't exist or error occurred, proceed with upload
+
 	// Create SFTP session
 	session, err := client.NewSession()
 	if err != nil {
@@ -823,4 +888,720 @@ func uploadFileViaSFTP(client *ssh.Client, localPath, remotePath string) error {
 
 	logAndPrint(t("log.file_uploaded", filepath.Base(localPath)))
 	return nil
+}
+
+// Changelog functions
+
+// readChangelog reads existing changelog entries for a specific version
+func readChangelog(workDir string, version string) (string, error) {
+	changelogPath := filepath.Join(workDir, "CHANGELOG.md")
+	if _, err := os.Stat(changelogPath); os.IsNotExist(err) {
+		return "", nil
+	}
+
+	content, err := os.ReadFile(changelogPath)
+	if err != nil {
+		return "", err
+	}
+
+	contentStr := string(content)
+	// Look for version section: ## [Version] or ## Version
+	versionRegex := regexp.MustCompile(fmt.Sprintf(`(?is)##\s*\[?%s\]?.*?\n(.*?)(?=\n##\s*\[?|$)`, regexp.QuoteMeta(version)))
+	matches := versionRegex.FindStringSubmatch(contentStr)
+	if len(matches) > 1 {
+		return strings.TrimSpace(matches[1]), nil
+	}
+
+	return "", nil
+}
+
+// writeChangelog writes/updates changelog entries for a version
+func writeChangelog(workDir string, version string, content string) error {
+	changelogPath := filepath.Join(workDir, "CHANGELOG.md")
+	currentDate := time.Now().Format("2006-01-02")
+
+	var existingContent string
+	var newContent string
+
+	if _, err := os.Stat(changelogPath); os.IsNotExist(err) {
+		// Create new changelog
+		newContent = fmt.Sprintf("# Changelog\n\n## [%s] - %s\n\n%s\n", version, currentDate, content)
+	} else {
+		// Read existing content
+		data, err := os.ReadFile(changelogPath)
+		if err != nil {
+			return err
+		}
+		existingContent = string(data)
+
+		// Check if version entry already exists
+		versionRegex := regexp.MustCompile(fmt.Sprintf(`(?is)(##\s*\[?%s\]?\s*-\s*[0-9-]+.*?\n)(.*?)(?=\n##\s*\[?|$)`, regexp.QuoteMeta(version)))
+		if versionRegex.MatchString(existingContent) {
+			// Replace existing entry
+			newContent = versionRegex.ReplaceAllString(existingContent, fmt.Sprintf("## [%s] - %s\n\n%s\n", version, currentDate, content))
+		} else {
+			// Add new entry at the beginning (after # Changelog)
+			changelogHeaderRegex := regexp.MustCompile(`(?is)^(#\s*Changelog\s*\n)`)
+			if changelogHeaderRegex.MatchString(existingContent) {
+				newContent = changelogHeaderRegex.ReplaceAllString(existingContent, fmt.Sprintf("$1\n## [%s] - %s\n\n%s\n\n", version, currentDate, content))
+			} else {
+				newContent = fmt.Sprintf("# Changelog\n\n## [%s] - %s\n\n%s\n\n%s", version, currentDate, content, existingContent)
+			}
+		}
+	}
+
+	// Write changelog
+	return os.WriteFile(changelogPath, []byte(newContent), 0644)
+}
+
+// getChangedFiles detects changed files using git
+func getChangedFiles(workDir string) ([]string, error) {
+	// Check if .git exists
+	if _, err := os.Stat(filepath.Join(workDir, ".git")); os.IsNotExist(err) {
+		return []string{}, nil
+	}
+
+	// Try to get last tag
+	cmd := exec.Command("git", "describe", "--tags", "--abbrev=0")
+	cmd.Dir = workDir
+	lastTag, err := cmd.Output()
+	if err != nil {
+		// No tag found, compare against HEAD (staged and unstaged changes)
+		cmd = exec.Command("git", "diff", "--name-only", "HEAD")
+		cmd.Dir = workDir
+		output, err := cmd.Output()
+		if err != nil {
+			return []string{}, nil // Ignore errors, return empty list
+		}
+		files := strings.Split(strings.TrimSpace(string(output)), "\n")
+		result := []string{}
+		for _, file := range files {
+			if file != "" {
+				result = append(result, file)
+			}
+		}
+		return result, nil
+	}
+
+	// Compare against last tag
+	cmd = exec.Command("git", "diff", "--name-only", strings.TrimSpace(string(lastTag)), "HEAD")
+	cmd.Dir = workDir
+	output, err := cmd.Output()
+	if err != nil {
+		return []string{}, nil // Ignore errors, return empty list
+	}
+
+	files := strings.Split(strings.TrimSpace(string(output)), "\n")
+	result := []string{}
+	for _, file := range files {
+		if file != "" {
+			result = append(result, file)
+		}
+	}
+	return result, nil
+}
+
+// isInteractiveTerminal checks if stdin is an interactive terminal
+func isInteractiveTerminal() bool {
+	fileInfo, err := os.Stdin.Stat()
+	if err != nil {
+		return false
+	}
+	// Check if stdin is a character device (interactive terminal)
+	return (fileInfo.Mode() & os.ModeCharDevice) != 0
+}
+
+// promptChangelogText prompts user for changelog text
+func promptChangelogText(version string, existingText string, changedFiles []string) (string, error) {
+	var preview strings.Builder
+
+	if existingText != "" {
+		preview.WriteString(existingText)
+		preview.WriteString("\n\n")
+	}
+
+	if len(changedFiles) > 0 {
+		preview.WriteString("Changed files:\n")
+		for _, file := range changedFiles {
+			preview.WriteString(fmt.Sprintf("- %s\n", file))
+		}
+	}
+
+	if preview.Len() > 0 {
+		fmt.Println(t("prompt.changelog_preview"))
+		fmt.Println(preview.String())
+	}
+
+	// Check for environment variable to skip input (useful for debugging/testing)
+	if os.Getenv("SKIP_CHANGELOG_INPUT") != "" || os.Getenv("AUTO_CHANGELOG") != "" {
+		if preview.Len() > 0 {
+			logAndPrint("Using auto-generated changelog (SKIP_CHANGELOG_INPUT or AUTO_CHANGELOG is set)")
+			return strings.TrimSpace(preview.String()), nil
+		}
+		return "", nil
+	}
+
+	// Check if stdin is interactive (not available in debugger)
+	if !isInteractiveTerminal() {
+		if preview.Len() > 0 {
+			logAndPrint("Non-interactive terminal detected, using auto-generated changelog")
+			return strings.TrimSpace(preview.String()), nil
+		}
+		logAndPrint("Non-interactive terminal detected and no preview available, skipping changelog input")
+		return "", nil
+	}
+
+	fmt.Print(t("prompt.changelog_text", version))
+	reader := bufio.NewReader(os.Stdin)
+	input, err := reader.ReadString('\n')
+	if err != nil {
+		// If reading fails (e.g., in debugger), fall back to preview
+		if preview.Len() > 0 {
+			logAndPrint("Error reading input, using auto-generated changelog")
+			return strings.TrimSpace(preview.String()), nil
+		}
+		return "", err
+	}
+
+	text := strings.TrimSpace(input)
+	if text == "" && preview.Len() > 0 {
+		// Use preview if user just presses Enter
+		return strings.TrimSpace(preview.String()), nil
+	}
+
+	return text, nil
+}
+
+// processChangelog handles the complete changelog workflow
+func processChangelog(workDir string, version string, updateInfo *UpdateInfo) (string, error) {
+	logAndPrint(t("log.changelog_reading", version))
+
+	// Read existing changelog entry
+	existingText, err := readChangelog(workDir, version)
+	if err != nil {
+		logAndPrint(t("error.changelog_read", err))
+	}
+
+	// Get changed files
+	changedFiles, err := getChangedFiles(workDir)
+	if err != nil {
+		logAndPrint(t("error.changed_files", err))
+		changedFiles = []string{}
+	} else {
+		logAndPrint(t("log.changed_files_detected", len(changedFiles)))
+	}
+
+	// Prompt user for changelog text
+	changelogText, err := promptChangelogText(version, existingText, changedFiles)
+	if err != nil {
+		return "", fmt.Errorf("%s", t("error.changelog_prompt", err))
+	}
+
+	if changelogText == "" {
+		return "", nil
+	}
+
+	// Write changelog
+	logAndPrint(t("log.changelog_writing", version))
+	err = writeChangelog(workDir, version, changelogText)
+	if err != nil {
+		return "", err
+	}
+	logAndPrint(t("log.changelog_updated"))
+
+	return changelogText, nil
+}
+
+// updateChangelogInUpdateInfo adds changelog to update_info.json as HTML
+func updateChangelogInUpdateInfo(updateInfo *UpdateInfo, changelogText string) {
+	if updateInfo.Sections == nil {
+		updateInfo.Sections = make(map[string]string)
+	}
+
+	// Convert markdown to simple HTML (basic conversion)
+	htmlText := html.EscapeString(changelogText)
+	htmlText = strings.ReplaceAll(htmlText, "\n\n", "</p><p>")
+	htmlText = strings.ReplaceAll(htmlText, "\n", "<br/>")
+	htmlText = "<p>" + htmlText + "</p>"
+	htmlText = regexp.MustCompile(`<p></p>`).ReplaceAllString(htmlText, "")
+	htmlText = regexp.MustCompile(`- (.+)`).ReplaceAllString(htmlText, "<li>$1</li>")
+	htmlText = strings.ReplaceAll(htmlText, "<p><li>", "<ul><li>")
+	htmlText = strings.ReplaceAll(htmlText, "</li><br/>", "</li></ul><br/>")
+
+	updateInfo.Sections["changelog"] = htmlText
+	logAndPrint(t("log.changelog_in_update_info"))
+}
+
+// SVG conversion functions
+
+// findSVGFiles finds all SVG files in the Updates directory
+func findSVGFiles(updatesDir string) ([]string, error) {
+	files, err := os.ReadDir(updatesDir)
+	if err != nil {
+		return nil, err
+	}
+
+	var svgFiles []string
+	for _, file := range files {
+		if !file.IsDir() && strings.HasSuffix(strings.ToLower(file.Name()), ".svg") {
+			svgFiles = append(svgFiles, file.Name())
+		}
+	}
+
+	return svgFiles, nil
+}
+
+// checkSVGFilesChanged checks if any SVG files have been modified
+func checkSVGFilesChanged(workDir string) ([]string, error) {
+	updatesDir := filepath.Join(workDir, "Updates")
+
+	// Check via git if files changed
+	if _, err := os.Stat(filepath.Join(workDir, ".git")); err == nil {
+		changedFiles, err := getChangedFiles(workDir)
+		if err == nil {
+			var changedSVGFiles []string
+			for _, file := range changedFiles {
+				if strings.HasSuffix(strings.ToLower(file), ".svg") {
+					// Get filename only
+					filename := filepath.Base(file)
+					changedSVGFiles = append(changedSVGFiles, filename)
+				}
+			}
+			return changedSVGFiles, nil
+		}
+	}
+
+	// If git check fails or no git repo, check all SVG files in Updates directory
+	svgFiles, err := findSVGFiles(updatesDir)
+	if err != nil {
+		return nil, err
+	}
+
+	return svgFiles, nil
+}
+
+// convertSVGToPNG converts SVG files to PNG using external tool
+func convertSVGToPNG(updatesDir string, svgFiles []string) error {
+	// Check for available converter
+	hasInkscape := false
+	hasImageMagick := false
+
+	if _, err := exec.LookPath("inkscape"); err == nil {
+		hasInkscape = true
+	}
+
+	if _, err := exec.LookPath("convert"); err == nil {
+		hasImageMagick = true
+	}
+
+	if !hasInkscape && !hasImageMagick {
+		logAndPrint(t("error.svg_converter_missing"))
+		logAndPrint("Skipping SVG to PNG conversion. Please install ImageMagick (convert) or Inkscape.")
+		return nil // Don't treat as error, just skip
+	}
+
+	// Determine which converter to use (prefer Inkscape as it's more reliable for SVG)
+	var converter func(string, string, []int, []int) error
+	if hasInkscape {
+		converter = convertSingleSVGWithInkscape
+	} else {
+		converter = convertSingleSVGWithImageMagick
+	}
+
+	// Convert each SVG file
+	for _, svgFile := range svgFiles {
+		svgPath := filepath.Join(updatesDir, svgFile)
+
+		// Determine output sizes based on filename patterns or use defaults
+		// Default sizes: square images get [128, 256], wide images get [772x250, 1544x500]
+		squareSizes := []int{128, 256}
+		wideSizes := [][]int{{772, 250}, {1544, 500}}
+
+		filename := strings.ToLower(filepath.Base(svgFile))
+
+		// Check if it looks like a logo/icon (square) or banner (wide)
+		isLikelyLogo := strings.Contains(filename, "logo") || strings.Contains(filename, "icon")
+		isLikelyBanner := strings.Contains(filename, "banner")
+
+		if isLikelyLogo {
+			// Generate square PNGs
+			for _, size := range squareSizes {
+				err := converter(svgPath, updatesDir, []int{size, size}, nil)
+				if err != nil {
+					return err
+				}
+			}
+		} else if isLikelyBanner {
+			// Generate banner PNGs
+			for _, dims := range wideSizes {
+				err := converter(svgPath, updatesDir, dims, nil)
+				if err != nil {
+					return err
+				}
+			}
+		} else {
+			// Unknown type - generate both square and banner sizes
+			for _, size := range squareSizes {
+				err := converter(svgPath, updatesDir, []int{size, size}, nil)
+				if err != nil {
+					return err
+				}
+			}
+			for _, dims := range wideSizes {
+				err := converter(svgPath, updatesDir, dims, nil)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// convertSingleSVGWithImageMagick converts a single SVG file to PNG with ImageMagick
+func convertSingleSVGWithImageMagick(svgPath string, outputDir string, squareSize []int, wideSize []int) error {
+	baseName := strings.TrimSuffix(filepath.Base(svgPath), ".svg")
+	baseName = strings.TrimSuffix(baseName, ".SVG")
+
+	var outputPath string
+	var resizeArg string
+
+	if len(squareSize) == 2 {
+		// Square image
+		outputPath = filepath.Join(outputDir, fmt.Sprintf("%s-%dx%d.png", baseName, squareSize[0], squareSize[1]))
+		resizeArg = fmt.Sprintf("%dx%d", squareSize[0], squareSize[1])
+	} else if len(wideSize) == 2 {
+		// Wide/banner image
+		outputPath = filepath.Join(outputDir, fmt.Sprintf("%s-%dx%d.png", baseName, wideSize[0], wideSize[1]))
+		resizeArg = fmt.Sprintf("%dx%d", wideSize[0], wideSize[1])
+	} else {
+		return fmt.Errorf("invalid size parameters")
+	}
+
+	cmd := exec.Command("convert", "-background", "transparent", "-resize", resizeArg, svgPath, outputPath)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to convert %s: %v", svgPath, err)
+	}
+
+	logAndPrint(fmt.Sprintf("Converted: %s -> %s", filepath.Base(svgPath), filepath.Base(outputPath)))
+	return nil
+}
+
+// convertSingleSVGWithInkscape converts a single SVG file to PNG with Inkscape
+func convertSingleSVGWithInkscape(svgPath string, outputDir string, squareSize []int, wideSize []int) error {
+	baseName := strings.TrimSuffix(filepath.Base(svgPath), ".svg")
+	baseName = strings.TrimSuffix(baseName, ".SVG")
+
+	var outputPath string
+	var width, height string
+
+	if len(squareSize) == 2 {
+		// Square image
+		outputPath = filepath.Join(outputDir, fmt.Sprintf("%s-%dx%d.png", baseName, squareSize[0], squareSize[1]))
+		width = strconv.Itoa(squareSize[0])
+		height = strconv.Itoa(squareSize[1])
+	} else if len(wideSize) == 2 {
+		// Wide/banner image
+		outputPath = filepath.Join(outputDir, fmt.Sprintf("%s-%dx%d.png", baseName, wideSize[0], wideSize[1]))
+		width = strconv.Itoa(wideSize[0])
+		height = strconv.Itoa(wideSize[1])
+	} else {
+		return fmt.Errorf("invalid size parameters")
+	}
+
+	cmd := exec.Command("inkscape", "--export-filename", outputPath, "--export-width", width, "--export-height", height, svgPath)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to convert %s: %v", svgPath, err)
+	}
+
+	logAndPrint(fmt.Sprintf("Converted: %s -> %s", filepath.Base(svgPath), filepath.Base(outputPath)))
+	return nil
+}
+
+// processSVGFiles checks and converts SVG files
+func processSVGFiles(workDir string, updateInfo *UpdateInfo) error {
+	updatesDir := filepath.Join(workDir, "Updates")
+
+	// Check if Updates directory exists
+	if _, err := os.Stat(updatesDir); os.IsNotExist(err) {
+		return nil // No Updates directory, skip SVG processing
+	}
+
+	// Find changed SVG files
+	changedSVGFiles, err := checkSVGFilesChanged(workDir)
+	if err != nil {
+		return err
+	}
+
+	if len(changedSVGFiles) == 0 {
+		return nil // No SVG files to process
+	}
+
+	logAndPrint(t("log.svg_converting"))
+	logAndPrint(fmt.Sprintf("Found %d SVG file(s) to convert", len(changedSVGFiles)))
+
+	err = convertSVGToPNG(updatesDir, changedSVGFiles)
+	if err != nil {
+		return err
+	}
+
+	logAndPrint(t("log.svg_converted"))
+	return nil
+}
+
+// GitHub integration functions
+
+// promptGitHubUpdate asks user if GitHub update should be performed
+func promptGitHubUpdate() bool {
+	// Check for environment variable to auto-approve
+	if autoUpdate := os.Getenv("AUTO_GITHUB_UPDATE"); autoUpdate != "" {
+		text := strings.ToLower(strings.TrimSpace(autoUpdate))
+		if text == "yes" || text == "y" || text == "j" || text == "ja" {
+			logAndPrint("Auto-approving GitHub update (AUTO_GITHUB_UPDATE is set)")
+			return true
+		}
+	}
+
+	// Check for environment variable to skip
+	if os.Getenv("SKIP_GITHUB_UPDATE") != "" {
+		logAndPrint("Skipping GitHub update (SKIP_GITHUB_UPDATE is set)")
+		return false
+	}
+
+	// Check if stdin is interactive
+	if !isInteractiveTerminal() {
+		logAndPrint("Non-interactive terminal detected, skipping GitHub update")
+		return false
+	}
+
+	fmt.Print(t("prompt.github_update"))
+	reader := bufio.NewReader(os.Stdin)
+	input, err := reader.ReadString('\n')
+	if err != nil {
+		logAndPrint("Error reading input, skipping GitHub update")
+		return false
+	}
+
+	text := strings.ToLower(strings.TrimSpace(input))
+	// Accept y, yes, j, ja
+	return text == "y" || text == "yes" || text == "j" || text == "ja"
+}
+
+// handleGitHubIntegration handles GitHub commit, tag and push after successful upload
+func handleGitHubIntegration(workDir string, updateInfo *UpdateInfo, zipPath string) error {
+	// Check if it's a GitHub repository
+	isGitHub, err := isGitHubRepository(workDir)
+	if err != nil {
+		return err
+	}
+
+	if !isGitHub {
+		logAndPrint(t("log.github_no_repo"))
+		return nil
+	}
+
+	logAndPrint(t("log.github_repo_detected"))
+
+	// Ask user for confirmation
+	if !promptGitHubUpdate() {
+		logAndPrint("GitHub update skipped by user")
+		return nil
+	}
+
+	// Get changelog text from update_info.json (remove HTML tags for commit message)
+	changelogText := ""
+	if updateInfo.Sections != nil {
+		htmlChangelog := updateInfo.Sections["changelog"]
+		if htmlChangelog != "" {
+			// Simple HTML tag removal for commit message
+			changelogText = regexp.MustCompile(`<[^>]*>`).ReplaceAllString(htmlChangelog, "")
+			changelogText = strings.TrimSpace(changelogText)
+		}
+	}
+
+	// Extract version from updateInfo
+	version := updateInfo.Version
+	if version == "" {
+		// Try to extract from filename
+		re := regexp.MustCompile(`v?([0-9]+\.[0-9]+(?:\.[0-9]+)?)`)
+		if matches := re.FindStringSubmatch(filepath.Base(zipPath)); len(matches) > 1 {
+			version = matches[1]
+		}
+	}
+
+	if version == "" {
+		logAndPrint("Could not determine version for GitHub update")
+		return nil
+	}
+
+	tagExists, err := checkGitTagExists(workDir, version)
+	if err != nil {
+		logAndPrint(t("error.git_tag_check", err))
+		return err
+	}
+
+	if tagExists {
+		logAndPrint(t("log.git_tag_exists", version))
+	} else {
+		logAndPrint(t("log.git_tag_not_exists", version))
+	}
+
+	logAndPrint(t("log.git_committing"))
+	err = gitCommitAndTag(workDir, version, changelogText)
+	if err != nil {
+		logAndPrint(t("error.git_commit", err))
+		return err
+	}
+
+	logAndPrint(t("log.git_tagging", version))
+	logAndPrint(t("log.git_pushing"))
+	err = syncToRemote(workDir)
+	if err != nil {
+		logAndPrint(t("error.git_push", err))
+		return err
+	}
+
+	logAndPrint(t("log.git_completed"))
+	return nil
+}
+
+// isGitHubRepository checks if the project is in a GitHub repository
+func isGitHubRepository(workDir string) (bool, error) {
+	gitConfigPath := filepath.Join(workDir, ".git", "config")
+	if _, err := os.Stat(gitConfigPath); os.IsNotExist(err) {
+		return false, nil
+	}
+
+	content, err := os.ReadFile(gitConfigPath)
+	if err != nil {
+		return false, err
+	}
+
+	contentStr := string(content)
+	// Check for GitHub URLs
+	githubRegex := regexp.MustCompile(`(?i)(github\.com|githubusercontent\.com)`)
+	return githubRegex.MatchString(contentStr), nil
+}
+
+// checkGitTagExists checks if a Git tag exists
+func checkGitTagExists(workDir string, version string) (bool, error) {
+	if _, err := os.Stat(filepath.Join(workDir, ".git")); os.IsNotExist(err) {
+		return false, nil
+	}
+
+	tagName := fmt.Sprintf("v%s", version)
+	cmd := exec.Command("git", "tag", "-l", tagName)
+	cmd.Dir = workDir
+	output, err := cmd.Output()
+	if err != nil {
+		return false, err
+	}
+
+	return strings.TrimSpace(string(output)) == tagName, nil
+}
+
+// gitCommitAndTag commits changes and creates/updates tag
+func gitCommitAndTag(workDir string, version string, changelogText string) error {
+	if changelogText == "" {
+		changelogText = fmt.Sprintf("Release version %s", version)
+	}
+
+	// Stage all changes
+	cmd := exec.Command("git", "add", "-A")
+	cmd.Dir = workDir
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("%s: %v", t("error.git_commit"), err)
+	}
+
+	// Commit
+	cmd = exec.Command("git", "commit", "-m", changelogText)
+	cmd.Dir = workDir
+	if err := cmd.Run(); err != nil {
+		// Check if there are changes to commit
+		cmd = exec.Command("git", "diff", "--cached", "--quiet")
+		cmd.Dir = workDir
+		if err2 := cmd.Run(); err2 != nil {
+			// There are changes, so commit failed
+			return fmt.Errorf("%s: %v", t("error.git_commit"), err)
+		}
+		// No changes to commit, that's okay
+	}
+
+	tagName := fmt.Sprintf("v%s", version)
+
+	// Check if tag exists
+	tagExists, err := checkGitTagExists(workDir, version)
+	if err != nil {
+		return err
+	}
+
+	if tagExists {
+		// Delete existing tag
+		cmd = exec.Command("git", "tag", "-d", tagName)
+		cmd.Dir = workDir
+		cmd.Run() // Ignore errors
+	}
+
+	// Create tag
+	cmd = exec.Command("git", "tag", "-a", tagName, "-m", changelogText)
+	cmd.Dir = workDir
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("%s: %v", t("error.git_tag"), err)
+	}
+
+	if tagExists {
+		// Push tag deletion first
+		cmd = exec.Command("git", "push", "origin", ":refs/tags/"+tagName)
+		cmd.Dir = workDir
+		cmd.Run() // Ignore errors
+	}
+
+	// Push tag
+	cmd = exec.Command("git", "push", "origin", tagName)
+	cmd.Dir = workDir
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("%s: %v", t("error.git_tag"), err)
+	}
+
+	return nil
+}
+
+// syncToRemote pushes commits and tags to remote
+func syncToRemote(workDir string) error {
+	// Push commits
+	cmd := exec.Command("git", "push")
+	cmd.Dir = workDir
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("%s: %v", t("error.git_push"), err)
+	}
+
+	return nil
+}
+
+// Upload optimization: check remote file modification time
+func getRemoteFileModTime(client *ssh.Client, remotePath string) (time.Time, error) {
+	session, err := client.NewSession()
+	if err != nil {
+		return time.Time{}, err
+	}
+	defer session.Close()
+
+	cmd := fmt.Sprintf("stat -c %%Y '%s' 2>/dev/null || stat -f %%m '%s' 2>/dev/null || echo", remotePath, remotePath)
+	output, err := session.Output(cmd)
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	timestampStr := strings.TrimSpace(string(output))
+	if timestampStr == "" {
+		return time.Time{}, fmt.Errorf("file does not exist")
+	}
+
+	timestamp, err := strconv.ParseInt(timestampStr, 10, 64)
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	return time.Unix(timestamp, 0), nil
 }
