@@ -12,13 +12,14 @@ package main
  * sconfig.go: Reading the config file with secure passwords
  * i18n.go: Internationalization of outputs and error messages
  *
- * Version: 1.2.2.34 (in version.go zu ändern)
+ * Version: 1.2.3.35 (in version.go zu ändern)
  *
  * Author: Jan Neuhaus, VAYA Consulting, https://vaya-consultig.de/development/ https://github.com/janmz
  *
  * Repository: https://github.com/janmz/wp_plugin_releaser
  *
  * ChangeLog:
+ *  06.11.25	1.2.3	fixed search for SVG tools, always compare to HEAD to find changed files
  *  06.11.25	1.2.2	fixed regexp for changelog parsing, fixed some lint errors
  *  06.11.25	1.2.1	fixed regexp for changelog parsing
  *  01.11.25	1.2.0	github integration, building of png from svg, check before upload
@@ -45,8 +46,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/janmz/sconfig"
@@ -102,6 +105,12 @@ type UpdateInfo struct {
 var logger *log.Logger
 var logFile *os.File
 var config ConfigType
+
+// Cache for executable paths
+var (
+	exePathCache     = make(map[string]*string)
+	exePathCacheLock sync.RWMutex
+)
 
 func main() {
 	// Get executable path
@@ -1032,7 +1041,8 @@ func getChangedFiles(workDir string) ([]string, error) {
 	cmd := exec.Command("git", "describe", "--tags", "--abbrev=0")
 	cmd.Dir = workDir
 	lastTag, err := cmd.Output()
-	if err != nil {
+	if true || err != nil {
+		// Always return the changes from HEAD!!!
 		// No tag found, compare against HEAD (staged and unstaged changes)
 		cmd = exec.Command("git", "diff", "--name-only", "HEAD")
 		cmd.Dir = workDir
@@ -1248,28 +1258,93 @@ func checkSVGFilesChanged(workDir string) ([]string, error) {
 }
 
 // convertSVGToPNG converts SVG files to PNG using external tool
+// lookUpExe searches for an executable in PATH and optionally in Windows Program Files
+// Returns the full path if found, or nil if not found. Results are cached.
+func lookUpExe(name string, windowsRelativePath string) *string {
+	// Create cache key
+	cacheKey := name
+	if runtime.GOOS == "windows" && windowsRelativePath != "" {
+		cacheKey = name + ":" + windowsRelativePath
+	}
+
+	// Check cache first
+	exePathCacheLock.RLock()
+	if cached, ok := exePathCache[cacheKey]; ok {
+		exePathCacheLock.RUnlock()
+		return cached
+	}
+	exePathCacheLock.RUnlock()
+
+	// Determine executable name with OS-specific extension
+	exeName := name
+	if runtime.GOOS == "windows" {
+		exeName = name + ".exe"
+	}
+
+	// First, try to find in PATH
+	path, err := exec.LookPath(exeName)
+	if err == nil {
+		// Found in PATH, cache and return
+		exePathCacheLock.Lock()
+		exePathCache[cacheKey] = &path
+		exePathCacheLock.Unlock()
+		return &path
+	}
+
+	// If Windows and relative path provided, check Program Files
+	if runtime.GOOS == "windows" && windowsRelativePath != "" {
+		programFiles := os.Getenv("ProgramFiles")
+		if programFiles == "" {
+			programFiles = "C:\\Program Files"
+		}
+
+		// Check if path contains wildcards
+		if strings.Contains(windowsRelativePath, "*") {
+			// Use glob to find matching directories
+			globPattern := filepath.Join(programFiles, windowsRelativePath, exeName)
+			matches, err := filepath.Glob(globPattern)
+			if err == nil && len(matches) > 0 {
+				// Use first match
+				fullPath := matches[0]
+				exePathCacheLock.Lock()
+				exePathCache[cacheKey] = &fullPath
+				exePathCacheLock.Unlock()
+				return &fullPath
+			}
+		} else {
+			// No wildcard, use direct path
+			fullPath := filepath.Join(programFiles, windowsRelativePath, exeName)
+			if _, err := os.Stat(fullPath); err == nil {
+				// Found in Program Files, cache and return
+				exePathCacheLock.Lock()
+				exePathCache[cacheKey] = &fullPath
+				exePathCacheLock.Unlock()
+				return &fullPath
+			}
+		}
+	}
+
+	// Not found, cache nil
+	exePathCacheLock.Lock()
+	exePathCache[cacheKey] = nil
+	exePathCacheLock.Unlock()
+	return nil
+}
+
 func convertSVGToPNG(updatesDir string, svgFiles []string) error {
-	// Check for available converter
-	hasInkscape := false
-	hasImageMagick := false
+	// Check for available converter using lookUpExe
+	execPathInkscape := lookUpExe("inkscape", "inkscape\\bin")
+	execPathImageMagick := lookUpExe("magick", "ImageMagick-*")
 
-	if _, err := exec.LookPath("inkscape"); err == nil {
-		hasInkscape = true
-	}
-
-	if _, err := exec.LookPath("convert"); err == nil {
-		hasImageMagick = true
-	}
-
-	if !hasInkscape && !hasImageMagick {
+	if execPathInkscape == nil && execPathImageMagick == nil {
 		logAndPrint(t("error.svg_converter_missing"))
-		logAndPrint("Skipping SVG to PNG conversion. Please install ImageMagick (convert) or Inkscape.")
+		logAndPrint("Skipping SVG to PNG conversion. Please install ImageMagick (magick) or Inkscape.")
 		return nil // Don't treat as error, just skip
 	}
 
 	// Determine which converter to use (prefer Inkscape as it's more reliable for SVG)
 	var converter func(string, string, []int, []int) error
-	if hasInkscape {
+	if execPathInkscape != nil {
 		converter = convertSingleSVGWithInkscape
 	} else {
 		converter = convertSingleSVGWithImageMagick
@@ -1346,7 +1421,13 @@ func convertSingleSVGWithImageMagick(svgPath string, outputDir string, squareSiz
 		return fmt.Errorf("invalid size parameters")
 	}
 
-	cmd := exec.Command("convert", "-background", "transparent", "-resize", resizeArg, svgPath, outputPath)
+	// Look up magick executable path
+	execPath := lookUpExe("magick", "ImageMagick-*")
+	if execPath == nil {
+		return fmt.Errorf("magick executable not found")
+	}
+
+	cmd := exec.Command(*execPath, "-background", "transparent", "-resize", resizeArg, svgPath, outputPath)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to convert %s: %v", svgPath, err)
 	}
@@ -1377,7 +1458,13 @@ func convertSingleSVGWithInkscape(svgPath string, outputDir string, squareSize [
 		return fmt.Errorf("invalid size parameters")
 	}
 
-	cmd := exec.Command("inkscape", "--export-filename", outputPath, "--export-width", width, "--export-height", height, svgPath)
+	// Look up inkscape executable path
+	execPath := lookUpExe("inkscape", "inkscape\\bin")
+	if execPath == nil {
+		return fmt.Errorf("inkscape executable not found")
+	}
+
+	cmd := exec.Command(*execPath, "--export-filename", outputPath, "--export-width", width, "--export-height", height, svgPath)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to convert %s: %v", svgPath, err)
 	}
