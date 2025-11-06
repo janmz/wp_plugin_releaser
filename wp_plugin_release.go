@@ -12,13 +12,14 @@ package main
  * sconfig.go: Reading the config file with secure passwords
  * i18n.go: Internationalization of outputs and error messages
  *
- * Version: 1.2.0.28 (in version.go zu ändern)
+ * Version: 1.2.1.30 (in version.go zu ändern)
  *
  * Author: Jan Neuhaus, VAYA Consulting, https://vaya-consultig.de/development/ https://github.com/janmz
  *
  * Repository: https://github.com/janmz/wp_plugin_releaser
  *
  * ChangeLog:
+ *  06.11.25	1.2.1	fixed regexp for changelog parsing
  *  01.11.25	1.2.0	github integration, building of png from svg, check before upload
  * 01.11.2025  	1.2.0	GitHub integration added
  * 17.08.2025  	1.1.3	Internationalization and changelog added
@@ -906,13 +907,35 @@ func readChangelog(workDir string, version string) (string, error) {
 
 	contentStr := string(content)
 	// Look for version section: ## [Version] or ## Version
-	versionRegex := regexp.MustCompile(fmt.Sprintf(`(?is)##\s*\[?%s\]?.*?\n(.*?)(?=\n##\s*\[?|$)`, regexp.QuoteMeta(version)))
-	matches := versionRegex.FindStringSubmatch(contentStr)
-	if len(matches) > 1 {
-		return strings.TrimSpace(matches[1]), nil
+	// Find the start of the version section (must be at start of line)
+	versionPattern := fmt.Sprintf(`(?im)^##\s*\[?%s\]?`, regexp.QuoteMeta(version))
+	versionStartRegex := regexp.MustCompile(versionPattern)
+	startMatch := versionStartRegex.FindStringIndex(contentStr)
+	if startMatch == nil {
+		return "", nil
 	}
 
-	return "", nil
+	// Find the start of the next section (##) or end of string
+	nextSectionRegex := regexp.MustCompile(`(?m)^##\s*\[?`)
+	nextMatches := nextSectionRegex.FindAllStringIndex(contentStr, -1)
+
+	var endPos int = len(contentStr)
+	for _, match := range nextMatches {
+		if match[0] > startMatch[0] {
+			endPos = match[0]
+			break
+		}
+	}
+
+	// Extract the section content (skip the header line)
+	sectionContent := contentStr[startMatch[0]:endPos]
+	// Find the first newline after the header to get the actual content
+	newlineIndex := strings.Index(sectionContent, "\n")
+	if newlineIndex >= 0 {
+		sectionContent = sectionContent[newlineIndex+1:]
+	}
+
+	return strings.TrimSpace(sectionContent), nil
 }
 
 // writeChangelog writes/updates changelog entries for a version

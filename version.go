@@ -1,7 +1,6 @@
 package main
 
 var (
-	Version   = "1.2.0.28" // Major, Minor, patch, Build
-	BuildTime = "2025-11-01 15:31:49"
-	GitCommit = "unknown"
+	Version   = "1.2.1.30" // Major, Minor, patch, Build
+	BuildTime = "2025-11-06 15:10:00"
 )
