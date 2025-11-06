@@ -12,13 +12,14 @@ package main
  * sconfig.go: Reading the config file with secure passwords
  * i18n.go: Internationalization of outputs and error messages
  *
- * Version: 1.2.1.30 (in version.go zu ändern)
+ * Version: 1.2.2.34 (in version.go zu ändern)
  *
  * Author: Jan Neuhaus, VAYA Consulting, https://vaya-consultig.de/development/ https://github.com/janmz
  *
  * Repository: https://github.com/janmz/wp_plugin_releaser
  *
  * ChangeLog:
+ *  06.11.25	1.2.2	fixed regexp for changelog parsing, fixed some lint errors
  *  06.11.25	1.2.1	fixed regexp for changelog parsing
  *  01.11.25	1.2.0	github integration, building of png from svg, check before upload
  * 01.11.2025  	1.2.0	GitHub integration added
@@ -103,16 +104,35 @@ var logFile *os.File
 var config ConfigType
 
 func main() {
+	// Get executable path
+	executablePath, err := os.Executable()
+	if err != nil {
+		executablePath = os.Args[0] // Fallback to first argument
+	}
+
+	// Parse and format BuildTime in localtime
+	var buildTimeStr string
+	buildTime, err := time.Parse("2006-01-02 15:04:05", BuildTime)
+	if err != nil {
+		// If parsing fails, use the string as-is
+		buildTimeStr = BuildTime
+	} else {
+		// Format in localtime
+		buildTimeStr = buildTime.Local().Format("2006-01-02 15:04:05")
+	}
+
+	// Display executable path, version and build time
+	fmt.Printf("%s, %s\n", t("app.executable_path", executablePath), t("app.version", Version, buildTimeStr))
 
 	// Determine working directory
 	var workDir string
 	if len(os.Args) > 1 {
 		workDir = os.Args[1]
 	} else {
-		var err error
-		workDir, err = os.Getwd()
-		if err != nil {
-			fmt.Printf(t("error.current_directory", err) + "\n")
+		var err2 error
+		workDir, err2 = os.Getwd()
+		if err2 != nil {
+			fmt.Printf(t("error.current_directory", err2) + "\n")
 			os.Exit(1)
 		}
 	}
@@ -130,7 +150,7 @@ func main() {
 	defer logFile.Close()
 
 	// Read config file
-	err := sconfig.LoadConfig(&config, 2, updateConfigPath, false)
+	err = sconfig.LoadConfig(&config, 2, updateConfigPath, false)
 	if err != nil {
 		logAndPrint(t("error.config_read", err))
 		os.Exit(1)
@@ -144,9 +164,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Display application name and version
-	appName := filepath.Base(os.Args[0])
-	logAndPrint(appName + " " + t("app.version", Version, BuildTime) + " " + t("app.working_directory", workDir))
+	// Display working directory (version and executable path already shown at start)
+	logAndPrint(t("app.working_directory", workDir))
 
 	// Read and update main PHP file
 	currentVersion, err := processMainPHPFile(workDir, config.MainPHPFile, updateInfo)
@@ -957,16 +976,41 @@ func writeChangelog(workDir string, version string, content string) error {
 		}
 		existingContent = string(data)
 
-		// Check if version entry already exists
-		versionRegex := regexp.MustCompile(fmt.Sprintf(`(?is)(##\s*\[?%s\]?\s*-\s*[0-9-]+.*?\n)(.*?)(?=\n##\s*\[?|$)`, regexp.QuoteMeta(version)))
-		if versionRegex.MatchString(existingContent) {
-			// Replace existing entry
-			newContent = versionRegex.ReplaceAllString(existingContent, fmt.Sprintf("## [%s] - %s\n\n%s\n", version, currentDate, content))
+		// Check if version entry already exists (find start of version section)
+		versionPattern := fmt.Sprintf(`(?im)^##\s*\[?%s\]?\s*-\s*[0-9-]+`, regexp.QuoteMeta(version))
+		versionStartRegex := regexp.MustCompile(versionPattern)
+		startMatch := versionStartRegex.FindStringIndex(existingContent)
+
+		if startMatch != nil {
+			// Version entry exists, find where it ends (next section or end of file)
+			nextSectionRegex := regexp.MustCompile(`(?m)^##\s*\[?`)
+			nextMatches := nextSectionRegex.FindAllStringIndex(existingContent, -1)
+
+			var endPos int = len(existingContent)
+			for _, match := range nextMatches {
+				if match[0] > startMatch[0] {
+					endPos = match[0]
+					break
+				}
+			}
+
+			// Replace the existing entry
+			beforeEntry := existingContent[:startMatch[0]]
+			afterEntry := existingContent[endPos:]
+			newContent = beforeEntry + fmt.Sprintf("## [%s] - %s\n\n%s\n", version, currentDate, content) + afterEntry
 		} else {
 			// Add new entry at the beginning (after # Changelog)
-			changelogHeaderRegex := regexp.MustCompile(`(?is)^(#\s*Changelog\s*\n)`)
-			if changelogHeaderRegex.MatchString(existingContent) {
-				newContent = changelogHeaderRegex.ReplaceAllString(existingContent, fmt.Sprintf("$1\n## [%s] - %s\n\n%s\n\n", version, currentDate, content))
+			changelogHeaderRegex := regexp.MustCompile(`(?im)^#\s*Changelog\s*\n`)
+			headerMatch := changelogHeaderRegex.FindStringIndex(existingContent)
+			if headerMatch != nil {
+				// Find end of header line
+				headerEnd := strings.Index(existingContent[headerMatch[1]:], "\n")
+				if headerEnd >= 0 {
+					headerEnd += headerMatch[1] + 1
+				} else {
+					headerEnd = headerMatch[1]
+				}
+				newContent = existingContent[:headerEnd] + fmt.Sprintf("\n## [%s] - %s\n\n%s\n\n", version, currentDate, content) + existingContent[headerEnd:]
 			} else {
 				newContent = fmt.Sprintf("# Changelog\n\n## [%s] - %s\n\n%s\n\n%s", version, currentDate, content, existingContent)
 			}
@@ -1563,7 +1607,7 @@ func gitCommitAndTag(workDir string, version string, changelogText string) error
 		// Delete existing tag
 		cmd = exec.Command("git", "tag", "-d", tagName)
 		cmd.Dir = workDir
-		cmd.Run() // Ignore errors
+		_ = cmd.Run() // Ignore errors
 	}
 
 	// Create tag
@@ -1577,7 +1621,7 @@ func gitCommitAndTag(workDir string, version string, changelogText string) error
 		// Push tag deletion first
 		cmd = exec.Command("git", "push", "origin", ":refs/tags/"+tagName)
 		cmd.Dir = workDir
-		cmd.Run() // Ignore errors
+		_ = cmd.Run() // Ignore errors
 	}
 
 	// Push tag

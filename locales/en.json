@@ -1,5 +1,6 @@
 {
   "app.name": "WordPress Plugin Release Tool",
+  "app.executable_path": "Executable path: %s",
   "app.version": "Version %s from %s started",
   "app.working_directory": "Working directory: %s",
   "app.release_process_completed": "Release process completed successfully",
