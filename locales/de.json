@@ -109,6 +109,7 @@
   "log.git_tag_exists": "Tag v%s existiert bereits",
   "log.git_tag_not_exists": "Tag v%s existiert nicht, erstelle neuen Tag",
   "log.git_committing": "Committte Änderungen",
+  "log.git_syncing": "Synchronisiere mit Remote-Repository",
   "log.git_tagging": "Erstelle/aktualisiere Tag v%s",
   "log.git_pushing": "Pushe zu Remote-Repository",
   "log.git_completed": "Git-Operationen erfolgreich abgeschlossen",
@@ -127,6 +128,7 @@
   "error.github_check": "Fehler beim Prüfen des GitHub-Repositorys: %v",
   "error.git_tag_check": "Fehler beim Prüfen des Git-Tags: %v",
   "error.git_commit": "Fehler beim Committen der Änderungen: %v",
+  "error.git_sync": "Fehler beim Synchronisieren mit Remote: %v",
   "error.git_tag": "Fehler beim Erstellen/Aktualisieren des Tags: %v",
   "error.git_push": "Fehler beim Pushen zum Remote: %v",
   "error.remote_file_time": "Fehler beim Ermitteln der Remote-Datei-Modifikationszeit: %v"

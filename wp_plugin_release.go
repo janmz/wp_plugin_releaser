@@ -12,13 +12,14 @@ package main
  * sconfig.go: Reading the config file with secure passwords
  * i18n.go: Internationalization of outputs and error messages
  *
- * Version: 1.2.3.35 (in version.go zu ändern)
+ * Version: 1.2.4.36 (in version.go zu ändern)
  *
  * Author: Jan Neuhaus, VAYA Consulting, https://vaya-consultig.de/development/ https://github.com/janmz
  *
  * Repository: https://github.com/janmz/wp_plugin_releaser
  *
  * ChangeLog:
+ *  06.11.25	1.2.4	fixed missing sync/push after commit
  *  06.11.25	1.2.3	fixed search for SVG tools, always compare to HEAD to find changed files
  *  06.11.25	1.2.2	fixed regexp for changelog parsing, fixed some lint errors
  *  06.11.25	1.2.1	fixed regexp for changelog parsing
@@ -1680,6 +1681,26 @@ func gitCommitAndTag(workDir string, version string, changelogText string) error
 			return fmt.Errorf("%s: %v", t("error.git_commit"), err)
 		}
 		// No changes to commit, that's okay
+	}
+
+	// Sync with remote after commit
+	logAndPrint(t("log.git_syncing"))
+	cmd = exec.Command("git", "pull", "--rebase")
+	cmd.Dir = workDir
+	if err := cmd.Run(); err != nil {
+		// If pull fails, try without rebase
+		cmd = exec.Command("git", "pull")
+		cmd.Dir = workDir
+		if err2 := cmd.Run(); err2 != nil {
+			return fmt.Errorf("%s: %v", t("error.git_sync"), err2)
+		}
+	}
+
+	// Push commits after sync
+	cmd = exec.Command("git", "push")
+	cmd.Dir = workDir
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("%s: %v", t("error.git_push"), err)
 	}
 
 	tagName := fmt.Sprintf("v%s", version)

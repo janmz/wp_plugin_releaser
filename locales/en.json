@@ -109,6 +109,7 @@
   "log.git_tag_exists": "Tag v%s already exists",
   "log.git_tag_not_exists": "Tag v%s does not exist, will create new tag",
   "log.git_committing": "Committing changes",
+  "log.git_syncing": "Syncing with remote repository",
   "log.git_tagging": "Creating/updating tag v%s",
   "log.git_pushing": "Pushing to remote repository",
   "log.git_completed": "Git operations completed successfully",
@@ -127,6 +128,7 @@
   "error.github_check": "Error checking GitHub repository: %v",
   "error.git_tag_check": "Error checking Git tag: %v",
   "error.git_commit": "Error committing changes: %v",
+  "error.git_sync": "Error syncing with remote: %v",
   "error.git_tag": "Error creating/updating tag: %v",
   "error.git_push": "Error pushing to remote: %v",
   "error.remote_file_time": "Error getting remote file modification time: %v"
