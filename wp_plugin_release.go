@@ -12,13 +12,14 @@ package main
  * sconfig.go: Reading the config file with secure passwords
  * i18n.go: Internationalization of outputs and error messages
  *
- * Version: 1.2.4.36 (in version.go zu ändern)
+ * Version: 1.2.5.37 (in version.go zu ändern)
  *
  * Author: Jan Neuhaus, VAYA Consulting, https://vaya-consultig.de/development/ https://github.com/janmz
  *
  * Repository: https://github.com/janmz/wp_plugin_releaser
  *
  * ChangeLog:
+ *  20.11.25	1.2.5	fix: build and release workflow and cmd.Run() without error check
  *  06.11.25	1.2.4	fixed missing sync/push after commit
  *  06.11.25	1.2.3	fixed search for SVG tools, always compare to HEAD to find changed files
  *  06.11.25	1.2.2	fixed regexp for changelog parsing, fixed some lint errors
@@ -1715,7 +1716,7 @@ func gitCommitAndTag(workDir string, version string, changelogText string) error
 		// Delete existing tag
 		cmd = exec.Command("git", "tag", "-d", tagName)
 		cmd.Dir = workDir
-		_ = cmd.Run() // Ignore errors
+		_ = cmd.Run() //nolint:errcheck // Ignore errors - tag may not exist locally
 	}
 
 	// Create tag
@@ -1729,7 +1730,7 @@ func gitCommitAndTag(workDir string, version string, changelogText string) error
 		// Push tag deletion first
 		cmd = exec.Command("git", "push", "origin", ":refs/tags/"+tagName)
 		cmd.Dir = workDir
-		_ = cmd.Run() // Ignore errors
+		_ = cmd.Run() //nolint:errcheck // Ignore errors - tag may not exist on remote
 	}
 
 	// Push tag
