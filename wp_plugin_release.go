@@ -12,13 +12,14 @@ package main
  * sconfig.go: Reading the config file with secure passwords
  * i18n.go: Internationalization of outputs and error messages
  *
- * Version: 1.2.5.37 (in version.go zu ändern)
+ * Version: 1.2.6.38 (in version.go zu ändern)
  *
  * Author: Jan Neuhaus, VAYA Consulting, https://vaya-consultig.de/development/ https://github.com/janmz
  *
  * Repository: https://github.com/janmz/wp_plugin_releaser
  *
  * ChangeLog:
+ *  02.12.25	1.2.6	fix: using newst version of sconfig
  *  20.11.25	1.2.5	fix: build and release workflow and cmd.Run() without error check
  *  06.11.25	1.2.4	fixed missing sync/push after commit
  *  06.11.25	1.2.3	fixed search for SVG tools, always compare to HEAD to find changed files
