@@ -12,13 +12,14 @@ package main
  * sconfig.go: Reading the config file with secure passwords
  * i18n.go: Internationalization of outputs and error messages
  *
- * Version: 1.2.8.40 (in version.go zu ändern)
+ * Version: 1.2.9.42 (in version.go zu ändern)
  *
  * Author: Jan Neuhaus, VAYA Consulting, https://vaya-consultig.de/development/ https://github.com/janmz
  *
  * Repository: https://github.com/janmz/wp_plugin_releaser
  *
  * ChangeLog:
+ *  13.12.25	1.2.9	Disabled debug output from sconfig
  *  03.12.25	1.2.8	fix: using debug version of sconfig
  *  02.12.25	1.2.6	fix: using newst version of sconfig
  *  20.11.25	1.2.5	fix: build and release workflow and cmd.Run() without error check
@@ -27,10 +28,10 @@ package main
  *  06.11.25	1.2.2	fixed regexp for changelog parsing, fixed some lint errors
  *  06.11.25	1.2.1	fixed regexp for changelog parsing
  *  01.11.25	1.2.0	github integration, building of png from svg, check before upload
- * 01.11.2025  	1.2.0	GitHub integration added
- * 17.08.2025  	1.1.3	Internationalization and changelog added
- * 12.08.2025  	1.1.0	Provided via GitHub
- * 08.08.2025  	1.0.0	First version created and tested
+ *  01.11.25  	1.2.0	GitHub integration added
+ *  17.08.25  	1.1.3	Internationalization and changelog added
+ *  12.08.25  	1.1.0	Provided via GitHub
+ *  08.08.25  	1.0.0	First version created and tested
  *
  * (c)2025 Jan Neuhaus, VAYA Consulting
  *
@@ -145,17 +146,17 @@ func main() {
 		var err2 error
 		workDir, err2 = os.Getwd()
 		if err2 != nil {
-			fmt.Printf(t("error.current_directory", err2) + "\n")
+			fmt.Printf("%s", t("error.current_directory", err2)+"\n")
 			os.Exit(1)
 		}
 	}
 	if _, err := os.Stat(workDir); os.IsNotExist(err) {
-		fmt.Printf(t("error.no_directory", workDir) + "\n")
+		fmt.Printf("%s", t("error.no_directory", workDir)+"\n")
 		os.Exit(1)
 	}
 	updateConfigPath := filepath.Join(workDir, "update.config")
 	if _, err := os.Stat(updateConfigPath); os.IsNotExist(err) {
-		fmt.Printf(t("error.no_config", workDir) + "\n")
+		fmt.Printf("%s", t("error.no_config", workDir)+"\n")
 		os.Exit(1)
 	}
 	// Initialize logging
@@ -164,7 +165,7 @@ func main() {
 
 	// Read config file
 	// Set debugOutput to true to see hardware key generation details on stderr
-	err = sconfig.LoadConfig(&config, 2, updateConfigPath, false, true)
+	err = sconfig.LoadConfig(&config, 2, updateConfigPath, false, false)
 	if err != nil {
 		logAndPrint(t("error.config_read", err))
 		os.Exit(1)
@@ -266,7 +267,7 @@ func initLogging(workDir string) {
 	var err error
 	logFile, err = os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600) // # nosec G304
 	if err != nil {
-		fmt.Printf(t("error.log_file", err) + "\n")
+		fmt.Printf("%s", t("error.log_file", err)+"\n")
 		os.Exit(1)
 	}
 	logger = log.New(logFile, "", log.LstdFlags)
