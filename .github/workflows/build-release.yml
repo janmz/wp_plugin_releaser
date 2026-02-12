@@ -27,6 +27,15 @@ jobs:
       with:
         go-version: ${{ env.GO_VERSION }}
     
+    # sconfig ist per replace => ../sconfig eingebunden; in CI muss es geklont werden.
+    # Bei privatem sconfig-Repo: Secret REPO_ACCESS_TOKEN (PAT mit repo-Scope) anlegen.
+    - name: Checkout sconfig (replace dependency)
+      run: |
+        cd "$GITHUB_WORKSPACE/.."
+        git clone --depth 1 "https://x-access-token:${TOKEN}@github.com/janmz/sconfig.git"
+      env:
+        TOKEN: ${{ secrets.REPO_ACCESS_TOKEN || secrets.GITHUB_TOKEN }}
+
     - name: Cache Go modules
       uses: actions/cache@v4
       with:
@@ -102,7 +111,14 @@ jobs:
     - uses: actions/checkout@v4
       with:
         fetch-depth: 0
-    
+
+    - name: Checkout sconfig (replace dependency)
+      run: |
+        cd "$GITHUB_WORKSPACE/.."
+        git clone --depth 1 "https://x-access-token:${TOKEN}@github.com/janmz/sconfig.git"
+      env:
+        TOKEN: ${{ secrets.REPO_ACCESS_TOKEN || secrets.GITHUB_TOKEN }}
+
     - name: Set up Go
       uses: actions/setup-go@v4
       with:

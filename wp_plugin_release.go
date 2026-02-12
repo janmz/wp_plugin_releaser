@@ -12,13 +12,14 @@ package main
  * sconfig.go: Reading the config file with secure passwords
  * i18n.go: Internationalization of outputs and error messages
  *
- * Version: 1.2.9.42 (in version.go zu ändern)
+ * Version: 1.2.10.44 (in version.go zu ändern)
  *
  * Author: Jan Neuhaus, VAYA Consulting, https://vaya-consultig.de/development/ https://github.com/janmz
  *
  * Repository: https://github.com/janmz/wp_plugin_releaser
  *
  * ChangeLog:
+ *  12.02.26	1.2.10	Fixed: build-release process changed to clone the required janmz/sconfig
  *  13.12.25	1.2.9	Disabled debug output from sconfig
  *  03.12.25	1.2.8	fix: using debug version of sconfig
  *  02.12.25	1.2.6	fix: using newst version of sconfig
