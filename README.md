@@ -1,4 +1,4 @@
-# wp_plugin_releaser
+# WP_Plugin_Releaser
 
 [![Go Version](https://img.shields.io/github/go-mod/go-version/janmz/wp_plugin_releaser)](https://golang.org)
 [![Release](https://img.shields.io/github/v/release/janmz/wp_plugin_releaser)](https://github.com/janmz/wp_plugin_releaser/releases)
@@ -8,7 +8,10 @@
 
 *🌍 [🇩🇪 Deutsche Version](README.de.md) | 🇺🇸 English Version*
 
-**wp_plugin_releaser** is a lightweight Go tool for **automated WordPress plugin releases**, with full internationalization support, including:- Automatic version number updates in main PHP file
+**wp_plugin_releaser** is a lightweight Go tool for **automated WordPress plugin
+releases**, with full internationalization support, including:
+
+- Automatic version number updates in main PHP file
 - Update info management (`update_info.json`)
 - ZIP file creation with configurable exclusion patterns
 - Optional automatic SSH upload to update server
@@ -96,7 +99,7 @@ wp_plugin_release /path/to/plugin
 ### Configuration Fields
 
 | Field | Description | Required |
-|-------|-------------|----------|
+| ----- | ----------- | -------- |
 | `main_php_file` | Main PHP file of the plugin | ✅ |
 | `skip_pattern` | Files/directories to exclude from ZIP | ❌ |
 | `ssh_host` | SSH hostname for upload | ✅ |
@@ -220,14 +223,13 @@ You may freely use, modify, and distribute the code, **provided** you credit the
 
 ## Support
 
-If you find this project helpful, please support **CFI-Kinderhilfe**: [https://cfi-kinderhilfe.de/jetzt-spenden?q=VAYAWPR]
+If you find this project helpful, please support **CFI-Kinderhilfe**: [https://cfi-kinderhilfe.de](https://cfi-kinderhilfe.de/jetzt-spenden?q=VAYAWPR)
 (Donations go to CFI-Kinderhilfe, not the author.)
 
 ## Contact
 
-**Author**: Jan Neuhaus – VAYA Consulting  
-**Website**: [https://vaya-consulting.de/development?q=GITHUB]  
-**Repository**: [https://github.com/janmz/wp_plugin_release]
+**Author**: Jan Neuhaus – [VAYA Consulting](https://vaya-consulting.de/development?q=GITHUB)  
+**Repository**: [https://github.com/janmz/wp_plugin_release](https://github.com/janmz/wp_plugin_release)
 
 ## Additional Resources
 
