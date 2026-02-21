@@ -249,3 +249,41 @@ func TestCreateRemoteDirCommandEscapes(t *testing.T) {
 	// This test is intentionally a no-op placeholder to document limitation of pure unit tests for SSH.
 	_ = time.Now()
 }
+
+func TestSafeJoinWithinBase(ts *testing.T) {
+	base := ts.TempDir()
+	writeFile(ts, filepath.Join(base, "plugin.php"), "<?php")
+
+	okPath, err := safeJoinWithinBase(base, "plugin.php")
+	if err != nil {
+		ts.Fatalf("safeJoinWithinBase valid path error: %v", err)
+	}
+	if okPath == "" {
+		ts.Fatalf("safeJoinWithinBase returned empty path")
+	}
+
+	_, err = safeJoinWithinBase(base, ".."+string(filepath.Separator)+"secret.txt")
+	if err == nil {
+		ts.Fatalf("expected traversal error, got nil")
+	}
+}
+
+func TestValidatePluginSlug(ts *testing.T) {
+	if err := validatePluginSlug("my-plugin_123"); err != nil {
+		ts.Fatalf("expected valid slug, got error: %v", err)
+	}
+	if err := validatePluginSlug("../evil"); err == nil {
+		ts.Fatalf("expected invalid slug error")
+	}
+}
+
+func TestRedactSensitiveURL(ts *testing.T) {
+	urlWithToken := "https://example.com/update.json?token=secret&v=1#frag"
+	redacted := redactSensitiveURL(urlWithToken)
+	if strings.Contains(redacted, "token=") || strings.Contains(redacted, "#") {
+		ts.Fatalf("url was not redacted: %s", redacted)
+	}
+	if redacted != "https://example.com/update.json" {
+		ts.Fatalf("unexpected redacted url: %s", redacted)
+	}
+}

@@ -28,3 +28,6 @@ __debug*.exe*
 # OS files
 .DS_Store
 Thumbs.db
+
+# Local release configuration (contains secrets)
+update.config

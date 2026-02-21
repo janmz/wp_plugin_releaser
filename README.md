@@ -106,8 +106,28 @@ wp_plugin_release /path/to/plugin
 | `ssh_port` | SSH port (default: 22) | ✅ |
 | `ssh_dir_base` | Base directory on server | ✅ |
 | `ssh_user` | SSH username | ✅ |
-| `ssh_key_file` | Path to SSH private key | ❌ |
+| `ssh_key_file` | Path to SSH private key or `known_hosts` file | ❌ |
 | `ssh_password` | SSH password (encrypted after first use) | ✅ |
+
+### SSH Host Key Verification (Optional but Recommended)
+
+If `ssh_key_file` points to a `known_hosts` file and the file exists, host key verification is
+enabled for the SSH connection. If the file does not exist, the tool continues
+without host key verification.
+
+Create/update a known hosts file with:
+
+```bash
+ssh-keyscan -p 22 your-server.example.com >> known_hosts
+```
+
+You can then set:
+
+```json
+{
+  "ssh_key_file": "known_hosts"
+}
+```
 
 ## Security Features
 

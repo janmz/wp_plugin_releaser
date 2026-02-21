@@ -12,13 +12,14 @@ package main
  * sconfig.go: Reading the config file with secure passwords
  * i18n.go: Internationalization of outputs and error messages
  *
- * Version: 1.2.10.46 (in version.go zu ändern)
+ * Version: 1.2.11.49 (in version.go zu ändern)
  *
  * Author: Jan Neuhaus, VAYA Consulting, https://vaya-consultig.de/development/ https://github.com/janmz
  *
  * Repository: https://github.com/janmz/wp_plugin_releaser
  *
  * ChangeLog:
+ *  21.02.26	1.2.11	Fixed after security audit: use of host key, sftp instead of ssh, check pathes and parameters
  *  12.02.26	1.2.10	Fixed: build-release process changed to clone the required janmz/sconfig
  *  13.12.25	1.2.9	Disabled debug output from sconfig
  *  03.12.25	1.2.8	fix: using debug version of sconfig
@@ -50,6 +51,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -59,7 +61,9 @@ import (
 	"time"
 
 	"github.com/janmz/sconfig"
+	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/knownhosts"
 )
 
 // ConfigType structure for update.config
@@ -233,7 +237,7 @@ func main() {
 		os.Exit(1)
 	}
 	updateInfo.DownloadURL = strings.TrimSuffix(updateInfo.DownloadURL, remoteZIPName) + zipFileName
-	logAndPrint(t("log.download_url_set", updateInfo.DownloadURL))
+	logAndPrint(t("log.download_url_set", redactSensitiveURL(updateInfo.DownloadURL)))
 
 	err = setUpdateInfo(updateInfo, allData, updateInfoPath)
 	if err != nil {
@@ -280,7 +284,10 @@ func logAndPrint(message string) {
 }
 
 func processMainPHPFile(workDir, mainPHPFile string, updateInfo *UpdateInfo) (string, error) {
-	phpFilePath := filepath.Join(workDir, mainPHPFile)
+	phpFilePath, err := safeJoinWithinBase(workDir, mainPHPFile)
+	if err != nil {
+		return "", err
+	}
 	logAndPrint(t("log.processing_php", phpFilePath))
 
 	content, err := os.ReadFile(phpFilePath) // # nosec G304
@@ -386,7 +393,7 @@ func processMainPHPFile(workDir, mainPHPFile string, updateInfo *UpdateInfo) (st
 		oldSlug := ""
 		if pucMatch[2] > 0 && (pucMatch[3] > pucMatch[2]) {
 			oldDownloadURL = contentStr[pucMatch[2]:pucMatch[3]]
-			logAndPrint(t("log.puc_download_url", oldDownloadURL))
+			logAndPrint(t("log.puc_download_url", redactSensitiveURL(oldDownloadURL)))
 		} else {
 			return "", fmt.Errorf("%s", t("error.no_valid_puc", phpFilePath))
 		}
@@ -578,6 +585,9 @@ func setUpdateInfo(updateInfo *UpdateInfo, allData map[string]interface{}, updat
 }
 
 func createZipFile(sourceDir, zipPath string, skipPatterns []string, slug string) error {
+	if err := validatePluginSlug(slug); err != nil {
+		return err
+	}
 
 	logAndPrint(t("log.creating_zip", zipPath))
 
@@ -715,11 +725,30 @@ func uploadFiles(config *ConfigType, zipPath, updateInfoPath string, workDir str
 		return fmt.Errorf("%s", t("error.ssh_no_auth"))
 	}
 
-	// Setup SSH config ==> TODO include the HostKey-check and a workflow to get it!
+	hostKeyCallback := ssh.InsecureIgnoreHostKey() // #nosec G106
+	if config.SSHKeyFile != "" {
+		hostKeyFile := config.SSHKeyFile
+		if !filepath.IsAbs(hostKeyFile) {
+			hostKeyFile = filepath.Join(workDir, hostKeyFile)
+		}
+		if _, err := os.Stat(hostKeyFile); err == nil {
+			cb, err := knownhosts.New(hostKeyFile)
+			if err != nil {
+				logAndPrint(fmt.Sprintf("ssh_key_file is not a known_hosts file, fallback without host key verification: %v", err))
+			} else {
+				hostKeyCallback = cb
+				logAndPrint(fmt.Sprintf("SSH host key verification enabled via ssh_key_file: %s", hostKeyFile))
+			}
+		} else {
+			logAndPrint(fmt.Sprintf("ssh_key_file not found for host key verification, fallback without verification: %s", hostKeyFile))
+		}
+	}
+
+	// Setup SSH config
 	sshConfig := &ssh.ClientConfig{
 		User:            config.SSHUser,
 		Auth:            authMethods,
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // #nosec G106
+		HostKeyCallback: hostKeyCallback,
 		Timeout:         30 * time.Second,
 	}
 
@@ -780,7 +809,7 @@ func uploadFiles(config *ConfigType, zipPath, updateInfoPath string, workDir str
 					}
 				}
 			} else {
-				logAndPrint(t("log.banner_no_url", key, bannerUrl))
+				logAndPrint(t("log.banner_no_url", key, redactSensitiveURL(bannerUrl)))
 			}
 		}
 	}
@@ -799,7 +828,7 @@ func uploadFiles(config *ConfigType, zipPath, updateInfoPath string, workDir str
 					}
 				}
 			} else {
-				logAndPrint(t("log.icon_no_url", key, iconUrl))
+				logAndPrint(t("log.icon_no_url", key, redactSensitiveURL(iconUrl)))
 			}
 		}
 	}
@@ -833,14 +862,15 @@ func parseRemotePath(downloadURL string, basedir string) (string, error) {
 }
 
 func createRemoteDir(client *ssh.Client, remotePath string) error {
-	session, err := client.NewSession()
+	sftpClient, err := sftp.NewClient(client)
 	if err != nil {
 		return err
 	}
-	defer session.Close()
+	defer sftpClient.Close()
 
-	cmd := fmt.Sprintf("mkdir -p %s", remotePath)
-	err = session.Run(cmd)
+	remotePath = filepath.ToSlash(remotePath)
+	remotePath = path.Clean("/" + strings.TrimPrefix(remotePath, "/"))
+	err = sftpClient.MkdirAll(remotePath)
 	if err != nil {
 		return err
 	}
@@ -851,6 +881,7 @@ func createRemoteDir(client *ssh.Client, remotePath string) error {
 
 func uploadFileViaSFTP(client *ssh.Client, localPath, remotePath string) error {
 	remotePath = filepath.ToSlash(remotePath)
+	remotePath = path.Clean("/" + strings.TrimPrefix(remotePath, "/"))
 	logAndPrint(t("log.uploading_file", localPath, remotePath))
 
 	// Check remote file modification time
@@ -871,11 +902,11 @@ func uploadFileViaSFTP(client *ssh.Client, localPath, remotePath string) error {
 	// Remote file doesn't exist or error occurred, proceed with upload
 
 	// Create SFTP session
-	session, err := client.NewSession()
+	sftpClient, err := sftp.NewClient(client)
 	if err != nil {
 		return err
 	}
-	defer session.Close()
+	defer sftpClient.Close()
 
 	// Open local file
 	localFile, err := os.Open(localPath) // # nosec G304
@@ -884,42 +915,23 @@ func uploadFileViaSFTP(client *ssh.Client, localPath, remotePath string) error {
 	}
 	defer localFile.Close()
 
-	// Create remote file using cat command
 	remoteDir := filepath.Dir(remotePath)
 	remoteDir = filepath.ToSlash(remoteDir)
-	cmd := fmt.Sprintf("mkdir -p %s && cat > %s", remoteDir, remotePath)
-
-	stdin, err := session.StdinPipe()
+	if err := sftpClient.MkdirAll(remoteDir); err != nil {
+		return err
+	}
+	remoteFile, err := sftpClient.OpenFile(remotePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC)
 	if err != nil {
 		return err
 	}
+	defer remoteFile.Close()
 
-	// Start the remote command
-	err = session.Start(cmd)
+	_, err = io.Copy(remoteFile, localFile)
 	if err != nil {
 		return err
 	}
-
-	// Copy file content
-	_, err = io.Copy(stdin, localFile)
-	if err != nil {
-		err2 := stdin.Close()
-		if err2 != nil {
-			return fmt.Errorf("failed to close stdin: %w; original error: %v", err2, err)
-		}
-		return err
-	}
-
-	// Close stdin to signal EOF
-	err = stdin.Close()
-	if err != nil {
-		return err
-	}
-
-	// Wait for command to complete
-	err = session.Wait()
-	if err != nil {
-		return err
+	if err := sftpClient.Chtimes(remotePath, time.Now(), localInfo.ModTime()); err != nil {
+		logAndPrint(fmt.Sprintf("could not preserve remote file timestamp: %v", err))
 	}
 
 	logAndPrint(t("log.file_uploaded", filepath.Base(localPath)))
@@ -1762,27 +1774,68 @@ func syncToRemote(workDir string) error {
 
 // Upload optimization: check remote file modification time
 func getRemoteFileModTime(client *ssh.Client, remotePath string) (time.Time, error) {
-	session, err := client.NewSession()
+	sftpClient, err := sftp.NewClient(client)
 	if err != nil {
 		return time.Time{}, err
 	}
-	defer session.Close()
+	defer sftpClient.Close()
 
-	cmd := fmt.Sprintf("stat -c %%Y '%s' 2>/dev/null || stat -f %%m '%s' 2>/dev/null || echo", remotePath, remotePath)
-	output, err := session.Output(cmd)
+	remotePath = filepath.ToSlash(remotePath)
+	remotePath = path.Clean("/" + strings.TrimPrefix(remotePath, "/"))
+	info, err := sftpClient.Stat(remotePath)
 	if err != nil {
 		return time.Time{}, err
 	}
+	return info.ModTime(), nil
+}
 
-	timestampStr := strings.TrimSpace(string(output))
-	if timestampStr == "" {
-		return time.Time{}, fmt.Errorf("file does not exist")
+func safeJoinWithinBase(baseDir, relativePath string) (string, error) {
+	if strings.TrimSpace(relativePath) == "" {
+		return "", fmt.Errorf("main_php_file must not be empty")
+	}
+	if filepath.IsAbs(relativePath) {
+		return "", fmt.Errorf("main_php_file must be a relative path")
 	}
 
-	timestamp, err := strconv.ParseInt(timestampStr, 10, 64)
+	candidate := filepath.Join(baseDir, relativePath)
+	baseAbs, err := filepath.Abs(baseDir)
 	if err != nil {
-		return time.Time{}, err
+		return "", err
 	}
+	candidateAbs, err := filepath.Abs(candidate)
+	if err != nil {
+		return "", err
+	}
+	relToBase, err := filepath.Rel(baseAbs, candidateAbs)
+	if err != nil {
+		return "", err
+	}
+	if relToBase == ".." || strings.HasPrefix(relToBase, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("main_php_file escapes working directory: %s", relativePath)
+	}
+	return candidateAbs, nil
+}
 
-	return time.Unix(timestamp, 0), nil
+func validatePluginSlug(slug string) error {
+	if strings.TrimSpace(slug) == "" {
+		return fmt.Errorf("slug must not be empty")
+	}
+	allowed := regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+	if !allowed.MatchString(slug) {
+		return fmt.Errorf("invalid slug %q: only letters, numbers, underscore and dash are allowed", slug)
+	}
+	return nil
+}
+
+func redactSensitiveURL(rawURL string) string {
+	parsedURL, err := url.Parse(rawURL)
+	if err != nil {
+		return rawURL
+	}
+	if parsedURL.RawQuery == "" {
+		return rawURL
+	}
+	parsedURL.RawQuery = ""
+	parsedURL.Fragment = ""
+	return parsedURL.String()
 }

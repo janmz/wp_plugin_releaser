@@ -107,8 +107,28 @@ wp_plugin_release /pfad/zum/plugin
 | `ssh_port` | SSH-Port (Standard: 22) | ✅ |
 | `ssh_dir_base` | Basisverzeichnis auf dem Server | ✅ |
 | `ssh_user` | SSH-Benutzername | ✅ |
-| `ssh_key_file` | Pfad zum SSH-Private-Key | ❌ |
+| `ssh_key_file` | Pfad zum SSH-Private-Key oder zur `known_hosts`-Datei | ❌ |
 | `ssh_password` | SSH-Passwort (nach erstem Einsatz verschlüsselt) | ✅ |
+
+### SSH-Host-Key-Prüfung (optional, empfohlen)
+
+Wenn `ssh_key_file` auf eine `known_hosts`-Datei zeigt und die Datei existiert, wird die
+Host-Key-Prüfung für die SSH-Verbindung aktiviert. Falls die Datei nicht
+existiert, läuft das Tool weiterhin ohne Host-Key-Prüfung.
+
+Eine known_hosts-Datei kannst du so erzeugen/ergänzen:
+
+```bash
+ssh-keyscan -p 22 dein-server.example.com >> known_hosts
+```
+
+Danach kann in der Konfiguration z. B. stehen:
+
+```json
+{
+  "ssh_key_file": "known_hosts"
+}
+```
 
 ## Sicherheitsfunktionen
 
