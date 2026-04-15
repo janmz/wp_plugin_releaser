@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-04-15 12:09:07
+
+- Fix: If `ssh_known_hosts` (or default `~/.ssh/known_hosts`) is missing, the
+  SSH host key is fetched from the server on first connect and written to the
+  known_hosts file, enabling host key verification afterwards. This behavior
+  now only happens when started with `-trustserver`.
+
+- Fix: When started with `-c <msg>` or `-commit <msg>`, the given message is
+  used for the git commit message instead of interactive input.
+
 ## 2026-04-15 11:47:24
 
 - Fix: SVG→PNG conversion now also runs when expected PNGs exist but are older

@@ -12,13 +12,14 @@ package main
  * sconfig.go: Reading the config file with secure passwords
  * i18n.go: Internationalization of outputs and error messages
  *
- * Version: 1.2.12.53 (in version.go zu ändern)
+ * Version: 1.2.13.56 (in version.go zu ändern)
  *
  * Author: Jan Neuhaus, VAYA Consulting, https://vaya-consultig.de/development/ https://github.com/janmz
  *
  * Repository: https://github.com/janmz/wp_plugin_releaser
  *
  * ChangeLog:
+ *  15.04.26	1.2.13	Feature: accept host key with -trustserver, allow -c oder -commit to give a commit message
  *  15.04.26	1.2.12	Fix: really make sure, PNG are rebuild if SVGs are updated
  *  21.02.26	1.2.11	Fixed host key verification (ssh_known_hosts, ~/.ssh/known_hosts), sftp, path checks
  *  12.02.26	1.2.10	Fixed: build-release process changed to clone the required janmz/sconfig
@@ -49,6 +50,7 @@ import (
 	"html"
 	"io"
 	"log"
+	"net"
 	"net/url"
 	"os"
 	"os/exec"
@@ -118,6 +120,38 @@ var logger *log.Logger
 var logFile *os.File
 var config ConfigType
 
+func parseCLIArgs(args []string) (workDir string, trustServer bool, commitMessage string) {
+	workDir = ""
+	trustServer = false
+	commitMessage = ""
+
+	for i := 0; i < len(args); i++ {
+		a := strings.TrimSpace(args[i])
+		if a == "" {
+			continue
+		}
+		switch a {
+		case "-trustserver":
+			trustServer = true
+			continue
+		case "-c", "-commit":
+			if i+1 < len(args) {
+				commitMessage = strings.TrimSpace(args[i+1])
+				i++
+			}
+			continue
+		default:
+			if strings.HasPrefix(a, "-") {
+				continue
+			}
+			if workDir == "" {
+				workDir = a
+			}
+		}
+	}
+	return workDir, trustServer, commitMessage
+}
+
 // Cache for executable paths
 var (
 	exePathCache     = make(map[string]*string)
@@ -145,11 +179,10 @@ func main() {
 	// Display executable path, version and build time
 	fmt.Printf("%s, %s\n", t("app.executable_path", executablePath), t("app.version", Version, buildTimeStr))
 
+	workDir, trustServer, commitMessage := parseCLIArgs(os.Args[1:])
+
 	// Determine working directory
-	var workDir string
-	if len(os.Args) > 1 {
-		workDir = os.Args[1]
-	} else {
+	if workDir == "" {
 		var err2 error
 		workDir, err2 = os.Getwd()
 		if err2 != nil {
@@ -251,7 +284,7 @@ func main() {
 
 	// Upload via SSH if configured
 	if config.SSHHost != "" && config.SSHUser != "" {
-		err = uploadFiles(&config, zipPath, updateInfoPath, workDir, updateInfo)
+		err = uploadFiles(&config, zipPath, updateInfoPath, workDir, updateInfo, trustServer)
 		if err != nil {
 			logAndPrint(t("error.upload", err))
 		} else {
@@ -261,7 +294,7 @@ func main() {
 		logAndPrint(t("log.no_ssh_config"))
 	}
 
-	err = handleGitHubIntegration(workDir, updateInfo, zipPath)
+	err = handleGitHubIntegration(workDir, updateInfo, zipPath, commitMessage)
 	if err != nil {
 		logAndPrint(t("error.github_check", err))
 	}
@@ -695,7 +728,7 @@ func shouldSkip(path string, patterns []string) bool {
 	return false
 }
 
-func uploadFiles(config *ConfigType, zipPath, updateInfoPath string, workDir string, updateInfo *UpdateInfo) error {
+func uploadFiles(config *ConfigType, zipPath, updateInfoPath string, workDir string, updateInfo *UpdateInfo, trustServer bool) error {
 	logAndPrint(t("log.ssh_upload_start"))
 
 	// Setup authentication methods
@@ -727,6 +760,67 @@ func uploadFiles(config *ConfigType, zipPath, updateInfoPath string, workDir str
 		return fmt.Errorf("%s", t("error.ssh_no_auth"))
 	}
 
+	fetchServerHostKeyLine := func(host string, port string, user string, auth []ssh.AuthMethod) (string, error) {
+		if host == "" {
+			return "", fmt.Errorf("ssh host is empty")
+		}
+		if port == "" {
+			port = "22"
+		}
+		addr := fmt.Sprintf("%s:%s", host, port)
+		var capturedKey ssh.PublicKey
+		hostKeyCB := func(_ string, _ net.Addr, key ssh.PublicKey) error {
+			capturedKey = key
+			return nil
+		}
+		cfg := &ssh.ClientConfig{
+			User:            user,
+			Auth:            auth,
+			HostKeyCallback: hostKeyCB,
+			Timeout:         30 * time.Second,
+		}
+		client, err := ssh.Dial("tcp", addr, cfg)
+		if err != nil {
+			return "", err
+		}
+		defer client.Close()
+		if capturedKey == nil {
+			return "", fmt.Errorf("server did not send a host key")
+		}
+		return strings.TrimSpace(string(ssh.MarshalAuthorizedKey(capturedKey))), nil
+	}
+
+	ensureKnownHostsHasServerKey := func(knownHostsPath string, host string, port string) {
+		if !trustServer {
+			return
+		}
+		if knownHostsPath == "" || host == "" {
+			return
+		}
+		if _, err := os.Stat(knownHostsPath); err == nil {
+			return
+		}
+		keyLine, err := fetchServerHostKeyLine(host, port, config.SSHUser, authMethods)
+		if err != nil {
+			logAndPrint(fmt.Sprintf("Could not fetch SSH host key from server: %v", err))
+			return
+		}
+		hostToken := host
+		if port != "" && port != "22" {
+			hostToken = fmt.Sprintf("[%s]:%s", host, port)
+		}
+		entry := fmt.Sprintf("%s %s\n", hostToken, keyLine)
+		if err := os.MkdirAll(filepath.Dir(knownHostsPath), 0700); err != nil {
+			logAndPrint(fmt.Sprintf("Could not create known_hosts directory: %v", err))
+			return
+		}
+		if err := os.WriteFile(knownHostsPath, []byte(entry), 0600); err != nil {
+			logAndPrint(fmt.Sprintf("Could not write known_hosts file: %v", err))
+			return
+		}
+		logAndPrint(fmt.Sprintf("SSH host key saved to known_hosts: %s", knownHostsPath))
+	}
+
 	hostKeyCallback := ssh.InsecureIgnoreHostKey() // #nosec G106
 	hostKeyVerified := false
 	tryKnownHosts := func(path string) bool {
@@ -752,12 +846,15 @@ func uploadFiles(config *ConfigType, zipPath, updateInfoPath string, workDir str
 		if !filepath.IsAbs(khPath) {
 			khPath = filepath.Join(workDir, khPath)
 		}
+		ensureKnownHostsHasServerKey(khPath, config.SSHHost, config.SSHPort)
 		tryKnownHosts(khPath)
 	}
 	// 2. Else try standard ~/.ssh/known_hosts (works with key auth)
 	if !hostKeyVerified {
 		if home, err := os.UserHomeDir(); err == nil {
-			tryKnownHosts(filepath.Join(home, ".ssh", "known_hosts"))
+			defaultKH := filepath.Join(home, ".ssh", "known_hosts")
+			ensureKnownHostsHasServerKey(defaultKH, config.SSHHost, config.SSHPort)
+			tryKnownHosts(defaultKH)
 		}
 	}
 
@@ -1726,7 +1823,7 @@ func promptGitHubUpdate() bool {
 }
 
 // handleGitHubIntegration handles GitHub commit, tag and push after successful upload
-func handleGitHubIntegration(workDir string, updateInfo *UpdateInfo, zipPath string) error {
+func handleGitHubIntegration(workDir string, updateInfo *UpdateInfo, zipPath string, commitMessageOverride string) error {
 	// Check if it's a GitHub repository
 	isGitHub, err := isGitHubRepository(workDir)
 	if err != nil {
@@ -1785,7 +1882,7 @@ func handleGitHubIntegration(workDir string, updateInfo *UpdateInfo, zipPath str
 	}
 
 	logAndPrint(t("log.git_committing"))
-	err = gitCommitAndTag(workDir, version, changelogText)
+	err = gitCommitAndTag(workDir, version, changelogText, commitMessageOverride)
 	if err != nil {
 		logAndPrint(t("error.git_commit", err))
 		return err
@@ -1839,9 +1936,13 @@ func checkGitTagExists(workDir string, version string) (bool, error) {
 }
 
 // gitCommitAndTag commits changes and creates/updates tag
-func gitCommitAndTag(workDir string, version string, changelogText string) error {
-	if changelogText == "" {
-		changelogText = fmt.Sprintf("Release version %s", version)
+func gitCommitAndTag(workDir string, version string, changelogText string, commitMessageOverride string) error {
+	commitMessage := strings.TrimSpace(commitMessageOverride)
+	if commitMessage == "" {
+		commitMessage = changelogText
+	}
+	if commitMessage == "" {
+		commitMessage = fmt.Sprintf("Release version %s", version)
 	}
 
 	// Stage all changes
@@ -1852,7 +1953,7 @@ func gitCommitAndTag(workDir string, version string, changelogText string) error
 	}
 
 	// Commit
-	cmd = exec.Command("git", "commit", "-m", changelogText)
+	cmd = exec.Command("git", "commit", "-m", commitMessage)
 	cmd.Dir = workDir
 	if err := cmd.Run(); err != nil {
 		// Check if there are changes to commit
@@ -1901,7 +2002,7 @@ func gitCommitAndTag(workDir string, version string, changelogText string) error
 	}
 
 	// Create tag
-	cmd = exec.Command("git", "tag", "-a", tagName, "-m", changelogText)
+	cmd = exec.Command("git", "tag", "-a", tagName, "-m", commitMessage)
 	cmd.Dir = workDir
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("%s: %v", t("error.git_tag"), err)
