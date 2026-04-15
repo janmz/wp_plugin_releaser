@@ -12,13 +12,14 @@ package main
  * sconfig.go: Reading the config file with secure passwords
  * i18n.go: Internationalization of outputs and error messages
  *
- * Version: 1.2.14.58 (in version.go zu ändern)
+ * Version: 1.2.15.59 (in version.go zu ändern)
  *
  * Author: Jan Neuhaus, VAYA Consulting, https://vaya-consultig.de/development/ https://github.com/janmz
  *
  * Repository: https://github.com/janmz/wp_plugin_releaser
  *
  * ChangeLog:
+ *  15.04.26	1.2.15	Fix: changelog writes now always include a blank line at the end
  *  15.04.26	1.2.14	Fix: -trustserver works with exisiting host_key file and -c works also for the changelog message
  *  15.04.26	1.2.13	Feature: accept host key with -trustserver, allow -c oder -commit to give a commit message
  *  15.04.26	1.2.12	Fix: really make sure, PNG are rebuild if SVGs are updated
@@ -1188,6 +1189,11 @@ func writeChangelog(workDir string, version string, content string) error {
 			}
 		}
 	}
+
+	// Ensure the file ends with a newline (and therefore does not glue the next
+	// header to the last line if an entry is appended later).
+	newContent = strings.ReplaceAll(newContent, "\r\n", "\n")
+	newContent = strings.TrimRight(newContent, "\n") + "\n\n"
 
 	// Write changelog
 	return os.WriteFile(changelogPath, []byte(newContent), 0644)
