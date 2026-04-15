@@ -7,6 +7,10 @@
   known_hosts file, enabling host key verification afterwards. This behavior
   now only happens when started with `-trustserver`.
 
+- Fix: When started with `-trustserver` and a connection fails with
+  `knownhosts: key mismatch`, the SSH host key is fetched from the server,
+  appended to the used `known_hosts` file and the connection is retried once.
+
 - Fix: When started with `-c <msg>` or `-commit <msg>`, the given message is
   used for the git commit message instead of interactive input.
 

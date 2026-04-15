@@ -12,13 +12,14 @@ package main
  * sconfig.go: Reading the config file with secure passwords
  * i18n.go: Internationalization of outputs and error messages
  *
- * Version: 1.2.13.56 (in version.go zu ändern)
+ * Version: 1.2.14.58 (in version.go zu ändern)
  *
  * Author: Jan Neuhaus, VAYA Consulting, https://vaya-consultig.de/development/ https://github.com/janmz
  *
  * Repository: https://github.com/janmz/wp_plugin_releaser
  *
  * ChangeLog:
+ *  15.04.26	1.2.14	Fix: -trustserver works with exisiting host_key file and -c works also for the changelog message
  *  15.04.26	1.2.13	Feature: accept host key with -trustserver, allow -c oder -commit to give a commit message
  *  15.04.26	1.2.12	Fix: really make sure, PNG are rebuild if SVGs are updated
  *  21.02.26	1.2.11	Fixed host key verification (ssh_known_hosts, ~/.ssh/known_hosts), sftp, path checks
@@ -239,7 +240,7 @@ func main() {
 	}
 
 	// Process changelog
-	changelogText, err := processChangelog(workDir, currentVersion, updateInfo)
+	changelogText, err := processChangelog(workDir, currentVersion, updateInfo, commitMessage)
 	if err != nil {
 		logAndPrint(t("error.changelog_write", err))
 		// Don't exit, just continue without changelog
@@ -797,9 +798,6 @@ func uploadFiles(config *ConfigType, zipPath, updateInfoPath string, workDir str
 		if knownHostsPath == "" || host == "" {
 			return
 		}
-		if _, err := os.Stat(knownHostsPath); err == nil {
-			return
-		}
 		keyLine, err := fetchServerHostKeyLine(host, port, config.SSHUser, authMethods)
 		if err != nil {
 			logAndPrint(fmt.Sprintf("Could not fetch SSH host key from server: %v", err))
@@ -814,15 +812,22 @@ func uploadFiles(config *ConfigType, zipPath, updateInfoPath string, workDir str
 			logAndPrint(fmt.Sprintf("Could not create known_hosts directory: %v", err))
 			return
 		}
-		if err := os.WriteFile(knownHostsPath, []byte(entry), 0600); err != nil {
+		f, err := os.OpenFile(knownHostsPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600) // # nosec G304
+		if err != nil {
+			logAndPrint(fmt.Sprintf("Could not open known_hosts file: %v", err))
+			return
+		}
+		defer f.Close()
+		if _, err := f.WriteString(entry); err != nil {
 			logAndPrint(fmt.Sprintf("Could not write known_hosts file: %v", err))
 			return
 		}
-		logAndPrint(fmt.Sprintf("SSH host key saved to known_hosts: %s", knownHostsPath))
+		logAndPrint(fmt.Sprintf("SSH host key appended to known_hosts: %s", knownHostsPath))
 	}
 
 	hostKeyCallback := ssh.InsecureIgnoreHostKey() // #nosec G106
 	hostKeyVerified := false
+	knownHostsPathUsed := ""
 	tryKnownHosts := func(path string) bool {
 		if path == "" {
 			return false
@@ -837,6 +842,7 @@ func uploadFiles(config *ConfigType, zipPath, updateInfoPath string, workDir str
 		}
 		hostKeyCallback = cb
 		hostKeyVerified = true
+		knownHostsPathUsed = path
 		logAndPrint(fmt.Sprintf("SSH host key verification enabled: %s", path))
 		return true
 	}
@@ -878,7 +884,31 @@ func uploadFiles(config *ConfigType, zipPath, updateInfoPath string, workDir str
 
 	client, err := ssh.Dial("tcp", addr, sshConfig)
 	if err != nil {
-		return fmt.Errorf(t("error.ssh_connection"), err)
+		// If server key changed and trustServer is set, fetch host key and append
+		// to the same known_hosts file, then retry once.
+		if trustServer && strings.Contains(err.Error(), "knownhosts: key mismatch") && knownHostsPathUsed != "" {
+			logAndPrint("SSH host key mismatch detected; trusting server and updating known_hosts")
+			ensureKnownHostsHasServerKey(knownHostsPathUsed, config.SSHHost, port)
+			cb, err2 := knownhosts.New(knownHostsPathUsed)
+			if err2 == nil {
+				sshConfig2 := &ssh.ClientConfig{
+					User:            config.SSHUser,
+					Auth:            authMethods,
+					HostKeyCallback: cb,
+					Timeout:         30 * time.Second,
+				}
+				client2, err2 := ssh.Dial("tcp", addr, sshConfig2)
+				if err2 == nil {
+					client = client2
+					err = nil
+				} else {
+					err = err2
+				}
+			}
+		}
+		if err != nil {
+			return fmt.Errorf(t("error.ssh_connection"), err)
+		}
 	}
 	defer client.Close()
 	logAndPrint(t("log.ssh_connected"))
@@ -1222,7 +1252,10 @@ func isInteractiveTerminal() bool {
 }
 
 // promptChangelogText prompts user for changelog text
-func promptChangelogText(version string, existingText string, changedFiles []string) (string, error) {
+func promptChangelogText(version string, existingText string, changedFiles []string, textOverride string) (string, error) {
+	if strings.TrimSpace(textOverride) != "" {
+		return strings.TrimSpace(textOverride), nil
+	}
 	var preview strings.Builder
 
 	if existingText != "" {
@@ -1283,7 +1316,7 @@ func promptChangelogText(version string, existingText string, changedFiles []str
 }
 
 // processChangelog handles the complete changelog workflow
-func processChangelog(workDir string, version string, updateInfo *UpdateInfo) (string, error) {
+func processChangelog(workDir string, version string, updateInfo *UpdateInfo, textOverride string) (string, error) {
 	logAndPrint(t("log.changelog_reading", version))
 
 	// Read existing changelog entry
@@ -1302,7 +1335,7 @@ func processChangelog(workDir string, version string, updateInfo *UpdateInfo) (s
 	}
 
 	// Prompt user for changelog text
-	changelogText, err := promptChangelogText(version, existingText, changedFiles)
+	changelogText, err := promptChangelogText(version, existingText, changedFiles, textOverride)
 	if err != nil {
 		return "", fmt.Errorf("%s", t("error.changelog_prompt", err))
 	}
