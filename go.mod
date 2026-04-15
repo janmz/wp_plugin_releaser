@@ -1,8 +1,6 @@
 module github.com/janmz/wp_plugin_release
 
-go 1.24.0
-
-toolchain go1.24.11
+go 1.25.0
 
 require (
 	github.com/nicksnyder/go-i18n/v2 v2.6.0

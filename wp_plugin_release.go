@@ -12,14 +12,15 @@ package main
  * sconfig.go: Reading the config file with secure passwords
  * i18n.go: Internationalization of outputs and error messages
  *
- * Version: 1.2.11.49 (in version.go zu ändern)
+ * Version: 1.2.12.53 (in version.go zu ändern)
  *
  * Author: Jan Neuhaus, VAYA Consulting, https://vaya-consultig.de/development/ https://github.com/janmz
  *
  * Repository: https://github.com/janmz/wp_plugin_releaser
  *
  * ChangeLog:
- *  21.02.26	1.2.11	Fixed after security audit: use of host key, sftp instead of ssh, check pathes and parameters
+ *  15.04.26	1.2.12	Fix: really make sure, PNG are rebuild if SVGs are updated
+ *  21.02.26	1.2.11	Fixed host key verification (ssh_known_hosts, ~/.ssh/known_hosts), sftp, path checks
  *  12.02.26	1.2.10	Fixed: build-release process changed to clone the required janmz/sconfig
  *  13.12.25	1.2.9	Disabled debug output from sconfig
  *  03.12.25	1.2.8	fix: using debug version of sconfig
@@ -76,6 +77,7 @@ type ConfigType struct {
 	SSHDirBase        string   `json:"ssh_dir_base"`
 	SSHUser           string   `json:"ssh_user"`
 	SSHKeyFile        string   `json:"ssh_key_file"`
+	SSHKnownHosts     string   `json:"ssh_known_hosts"`
 	SSHPassword       string   `json:"ssh_password"`
 	SSHSecurePassword string   `json:"ssh_secure_password"`
 }
@@ -726,21 +728,36 @@ func uploadFiles(config *ConfigType, zipPath, updateInfoPath string, workDir str
 	}
 
 	hostKeyCallback := ssh.InsecureIgnoreHostKey() // #nosec G106
-	if config.SSHKeyFile != "" {
-		hostKeyFile := config.SSHKeyFile
-		if !filepath.IsAbs(hostKeyFile) {
-			hostKeyFile = filepath.Join(workDir, hostKeyFile)
+	hostKeyVerified := false
+	tryKnownHosts := func(path string) bool {
+		if path == "" {
+			return false
 		}
-		if _, err := os.Stat(hostKeyFile); err == nil {
-			cb, err := knownhosts.New(hostKeyFile)
-			if err != nil {
-				logAndPrint(fmt.Sprintf("ssh_key_file is not a known_hosts file, fallback without host key verification: %v", err))
-			} else {
-				hostKeyCallback = cb
-				logAndPrint(fmt.Sprintf("SSH host key verification enabled via ssh_key_file: %s", hostKeyFile))
-			}
-		} else {
-			logAndPrint(fmt.Sprintf("ssh_key_file not found for host key verification, fallback without verification: %s", hostKeyFile))
+		if _, err := os.Stat(path); err != nil {
+			return false
+		}
+		cb, err := knownhosts.New(path)
+		if err != nil {
+			logAndPrint(fmt.Sprintf("known_hosts file invalid: %v", err))
+			return false
+		}
+		hostKeyCallback = cb
+		hostKeyVerified = true
+		logAndPrint(fmt.Sprintf("SSH host key verification enabled: %s", path))
+		return true
+	}
+	// 1. Use ssh_known_hosts if explicitly set
+	if config.SSHKnownHosts != "" {
+		khPath := config.SSHKnownHosts
+		if !filepath.IsAbs(khPath) {
+			khPath = filepath.Join(workDir, khPath)
+		}
+		tryKnownHosts(khPath)
+	}
+	// 2. Else try standard ~/.ssh/known_hosts (works with key auth)
+	if !hostKeyVerified {
+		if home, err := os.UserHomeDir(); err == nil {
+			tryKnownHosts(filepath.Join(home, ".ssh", "known_hosts"))
 		}
 	}
 
@@ -1492,6 +1509,122 @@ func convertSingleSVGWithInkscape(svgPath string, outputDir string, squareSize [
 	return nil
 }
 
+func uniqueStrings(items []string) []string {
+	seen := make(map[string]struct{}, len(items))
+	var out []string
+	for _, s := range items {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			continue
+		}
+		if _, ok := seen[s]; ok {
+			continue
+		}
+		seen[s] = struct{}{}
+		out = append(out, s)
+	}
+	return out
+}
+
+func fileExists(path string) bool {
+	if _, err := os.Stat(path); err == nil {
+		return true
+	}
+	return false
+}
+
+func expectedPNGPathsForSVG(updatesDir string, svgFilename string) []string {
+	filename := strings.ToLower(filepath.Base(svgFilename))
+	baseName := strings.TrimSuffix(filepath.Base(svgFilename), ".svg")
+	baseName = strings.TrimSuffix(baseName, ".SVG")
+
+	squareSizes := []int{128, 256}
+	wideSizes := [][]int{{772, 250}, {1544, 500}}
+
+	isLikelyLogo := strings.Contains(filename, "logo") || strings.Contains(filename, "icon")
+	isLikelyBanner := strings.Contains(filename, "banner")
+
+	var out []string
+	if isLikelyLogo {
+		for _, size := range squareSizes {
+			out = append(out, filepath.Join(updatesDir, fmt.Sprintf("%s-%dx%d.png", baseName, size, size)))
+		}
+		return out
+	}
+	if isLikelyBanner {
+		for _, dims := range wideSizes {
+			out = append(out, filepath.Join(updatesDir, fmt.Sprintf("%s-%dx%d.png", baseName, dims[0], dims[1])))
+		}
+		return out
+	}
+
+	for _, size := range squareSizes {
+		out = append(out, filepath.Join(updatesDir, fmt.Sprintf("%s-%dx%d.png", baseName, size, size)))
+	}
+	for _, dims := range wideSizes {
+		out = append(out, filepath.Join(updatesDir, fmt.Sprintf("%s-%dx%d.png", baseName, dims[0], dims[1])))
+	}
+	return out
+}
+
+func findSVGsWithMissingPNGs(updatesDir string, svgFiles []string) []string {
+	var out []string
+	for _, svgFile := range svgFiles {
+		paths := expectedPNGPathsForSVG(updatesDir, svgFile)
+		if len(paths) == 0 {
+			continue
+		}
+		missing := false
+		for _, p := range paths {
+			if !fileExists(p) {
+				missing = true
+				break
+			}
+		}
+		if missing {
+			out = append(out, svgFile)
+		}
+	}
+	return uniqueStrings(out)
+}
+
+func findSVGsWithMissingOrStalePNGs(updatesDir string, svgFiles []string) []string {
+	var out []string
+	for _, svgFile := range svgFiles {
+		svgPath := filepath.Join(updatesDir, filepath.Base(svgFile))
+		svgInfo, err := os.Stat(svgPath)
+		if err != nil {
+			continue
+		}
+		paths := expectedPNGPathsForSVG(updatesDir, svgFile)
+		if len(paths) == 0 {
+			continue
+		}
+		for _, p := range paths {
+			pngInfo, err := os.Stat(p)
+			if err != nil {
+				out = append(out, svgFile)
+				break
+			}
+			if pngInfo.ModTime().Before(svgInfo.ModTime()) {
+				out = append(out, svgFile)
+				break
+			}
+		}
+	}
+	return uniqueStrings(out)
+}
+
+func filterExistingSVGsInUpdates(updatesDir string, svgFiles []string) []string {
+	var out []string
+	for _, svgFile := range svgFiles {
+		if fileExists(filepath.Join(updatesDir, filepath.Base(svgFile))) {
+			out = append(out, filepath.Base(svgFile))
+		}
+	}
+	return uniqueStrings(out)
+}
+
 // processSVGFiles checks and converts SVG files
 func processSVGFiles(workDir string, updateInfo *UpdateInfo) error {
 	updatesDir := filepath.Join(workDir, "Updates")
@@ -1507,14 +1640,45 @@ func processSVGFiles(workDir string, updateInfo *UpdateInfo) error {
 		return err
 	}
 
-	if len(changedSVGFiles) == 0 {
-		return nil // No SVG files to process
+	changedSVGFiles = filterExistingSVGsInUpdates(updatesDir, changedSVGFiles)
+
+	svgFilesToConvert := changedSVGFiles
+	if len(svgFilesToConvert) == 0 {
+		allSVGFiles, err := findSVGFiles(updatesDir)
+		if err != nil {
+			return err
+		}
+		allSVGFiles = filterExistingSVGsInUpdates(updatesDir, allSVGFiles)
+		svgFilesToConvert = findSVGsWithMissingOrStalePNGs(updatesDir, allSVGFiles)
+		if len(svgFilesToConvert) > 0 {
+			logAndPrint("SVGs changed: none detected; forcing conversion because PNGs are missing or stale")
+		}
+	}
+
+	if len(svgFilesToConvert) == 0 {
+		return nil // Nothing to convert
 	}
 
 	logAndPrint(t("log.svg_converting"))
-	logAndPrint(fmt.Sprintf("Found %d SVG file(s) to convert", len(changedSVGFiles)))
+	logAndPrint(fmt.Sprintf("Found %d SVG file(s) to convert", len(svgFilesToConvert)))
 
-	err = convertSVGToPNG(updatesDir, changedSVGFiles)
+	for _, svgFile := range svgFilesToConvert {
+		logAndPrint(fmt.Sprintf("SVG convert candidate: %s", svgFile))
+		svgPath := filepath.Join(updatesDir, filepath.Base(svgFile))
+		svgInfo, svgErr := os.Stat(svgPath)
+		for _, p := range expectedPNGPathsForSVG(updatesDir, svgFile) {
+			pngInfo, pngErr := os.Stat(p)
+			if pngErr == nil {
+				if svgErr == nil && pngInfo.ModTime().Before(svgInfo.ModTime()) {
+					logAndPrint(fmt.Sprintf("Stale PNG target: %s", filepath.Base(p)))
+				}
+				continue
+			}
+			logAndPrint(fmt.Sprintf("Missing PNG target: %s", filepath.Base(p)))
+		}
+	}
+
+	err = convertSVGToPNG(updatesDir, svgFilesToConvert)
 	if err != nil {
 		return err
 	}
