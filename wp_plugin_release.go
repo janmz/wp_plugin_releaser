@@ -12,13 +12,14 @@ package main
  * sconfig.go: Reading the config file with secure passwords
  * i18n.go: Internationalization of outputs and error messages
  *
- * Version: 1.2.15.59 (in version.go zu ändern)
+ * Version: 1.3.0.61 (in version.go zu ändern)
  *
  * Author: Jan Neuhaus, VAYA Consulting, https://vaya-consultig.de/development/ https://github.com/janmz
  *
  * Repository: https://github.com/janmz/wp_plugin_releaser
  *
  * ChangeLog:
+ *  15.04.26	1.3.0	Feature: Include last five changes in the update_info.json
  *  15.04.26	1.2.15	Fix: changelog writes now always include a blank line at the end
  *  15.04.26	1.2.14	Fix: -trustserver works with exisiting host_key file and -c works also for the changelog message
  *  15.04.26	1.2.13	Feature: accept host key with -trustserver, allow -c oder -commit to give a commit message
@@ -246,7 +247,7 @@ func main() {
 		logAndPrint(t("error.changelog_write", err))
 		// Don't exit, just continue without changelog
 	} else if changelogText != "" {
-		updateChangelogInUpdateInfo(updateInfo, changelogText)
+		updateChangelogInUpdateInfo(workDir, updateInfo, changelogText)
 	}
 
 	// Check and convert SVG files if changed
@@ -1361,21 +1362,143 @@ func processChangelog(workDir string, version string, updateInfo *UpdateInfo, te
 	return changelogText, nil
 }
 
+func escapeHTMLInline(s string) string {
+	// No line breaks allowed in update_info.json changelog HTML.
+	s = strings.ReplaceAll(s, "\r\n", "\n")
+	s = strings.ReplaceAll(s, "\r", "\n")
+	s = strings.ReplaceAll(s, "\n", " ")
+	s = strings.TrimSpace(s)
+	return html.EscapeString(s)
+}
+
+func buildChangelogDLFromFile(workDir string, maxEntries int) (string, error) {
+	if maxEntries <= 0 {
+		return "", nil
+	}
+	path := filepath.Join(workDir, "Changelog.md")
+	data, err := os.ReadFile(path) // # nosec G304
+	if err != nil {
+		return "", err
+	}
+	text := string(data)
+	text = strings.ReplaceAll(text, "\r\n", "\n")
+	text = strings.ReplaceAll(text, "\r", "\n")
+
+	lines := strings.Split(text, "\n")
+	type entry struct {
+		header string
+		lines  []string
+	}
+	var entries []entry
+	var cur *entry
+	for _, raw := range lines {
+		line := strings.TrimRight(raw, " \t")
+		if strings.HasPrefix(line, "## ") {
+			h := strings.TrimSpace(strings.TrimPrefix(line, "## "))
+			entries = append(entries, entry{header: h})
+			cur = &entries[len(entries)-1]
+			if len(entries) >= maxEntries {
+				// We have enough entries; keep collecting no more.
+				continue
+			}
+			continue
+		}
+		if cur == nil {
+			continue
+		}
+		// If we've already collected enough entries, ignore the rest.
+		if len(entries) > maxEntries {
+			continue
+		}
+		cur.lines = append(cur.lines, line)
+	}
+	if len(entries) > maxEntries {
+		entries = entries[:maxEntries]
+	}
+
+	var b strings.Builder
+	b.WriteString("<dl>")
+	for _, e := range entries {
+		header := escapeHTMLInline(e.header)
+		if header == "" {
+			continue
+		}
+		b.WriteString("<dt>")
+		b.WriteString(header)
+		b.WriteString("</dt><dd>")
+
+		// Convert markdown-ish bullets into an inline <ul>.
+		var items []string
+		var curItem string
+		flush := func() {
+			curItem = strings.TrimSpace(curItem)
+			if curItem != "" {
+				items = append(items, curItem)
+			}
+			curItem = ""
+		}
+		for _, l := range e.lines {
+			t := strings.TrimSpace(l)
+			if t == "" {
+				continue
+			}
+			if strings.HasPrefix(t, "- ") {
+				flush()
+				curItem = strings.TrimSpace(strings.TrimPrefix(t, "- "))
+				continue
+			}
+			// Continuation line (indented in markdown) → append to current bullet.
+			if curItem != "" {
+				curItem += " " + t
+				continue
+			}
+			// Non-bullet content; treat as its own item.
+			items = append(items, t)
+		}
+		flush()
+
+		if len(items) > 0 {
+			b.WriteString("<ul>")
+			for _, it := range items {
+				b.WriteString("<li>")
+				b.WriteString(escapeHTMLInline(it))
+				b.WriteString("</li>")
+			}
+			b.WriteString("</ul>")
+		}
+		b.WriteString("</dd>")
+	}
+	b.WriteString("</dl>")
+
+	out := b.String()
+	// Hard guarantee: no line breaks.
+	out = strings.ReplaceAll(out, "\n", "")
+	out = strings.ReplaceAll(out, "\r", "")
+	return out, nil
+}
+
 // updateChangelogInUpdateInfo adds changelog to update_info.json as HTML
-func updateChangelogInUpdateInfo(updateInfo *UpdateInfo, changelogText string) {
+func updateChangelogInUpdateInfo(workDir string, updateInfo *UpdateInfo, changelogText string) {
 	if updateInfo.Sections == nil {
 		updateInfo.Sections = make(map[string]string)
 	}
 
-	// Convert markdown to simple HTML (basic conversion)
-	htmlText := html.EscapeString(changelogText)
-	htmlText = strings.ReplaceAll(htmlText, "\n\n", "</p><p>")
-	htmlText = strings.ReplaceAll(htmlText, "\n", "<br/>")
-	htmlText = "<p>" + htmlText + "</p>"
-	htmlText = regexp.MustCompile(`<p></p>`).ReplaceAllString(htmlText, "")
-	htmlText = regexp.MustCompile(`- (.+)`).ReplaceAllString(htmlText, "<li>$1</li>")
-	htmlText = strings.ReplaceAll(htmlText, "<p><li>", "<ul><li>")
-	htmlText = strings.ReplaceAll(htmlText, "</li><br/>", "</li></ul><br/>")
+	htmlText, err := buildChangelogDLFromFile(workDir, 5)
+	if err != nil || strings.TrimSpace(htmlText) == "" {
+		// Fallback: Convert provided markdown to basic HTML (legacy behavior).
+		htmlText = html.EscapeString(changelogText)
+		htmlText = strings.ReplaceAll(htmlText, "\n\n", "</p><p>")
+		htmlText = strings.ReplaceAll(htmlText, "\n", "<br/>")
+		htmlText = "<p>" + htmlText + "</p>"
+		htmlText = regexp.MustCompile(`<p></p>`).ReplaceAllString(htmlText, "")
+		htmlText = regexp.MustCompile(`- (.+)`).ReplaceAllString(htmlText, "<li>$1</li>")
+		htmlText = strings.ReplaceAll(htmlText, "<p><li>", "<ul><li>")
+		htmlText = strings.ReplaceAll(htmlText, "</li><br/>", "</li></ul><br/>")
+		// Ensure no line breaks in fallback path either.
+		htmlText = strings.ReplaceAll(htmlText, "\r\n", "")
+		htmlText = strings.ReplaceAll(htmlText, "\n", "")
+		htmlText = strings.ReplaceAll(htmlText, "\r", "")
+	}
 
 	updateInfo.Sections["changelog"] = htmlText
 	logAndPrint(t("log.changelog_in_update_info"))

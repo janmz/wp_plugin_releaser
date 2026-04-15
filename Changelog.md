@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-04-15 21:01:02
+
+- Fix: `update_info.json` changelog now uses the latest 5 entries from
+  `Changelog.md`, formatted as a single-line HTML `<dl>` without line breaks.
+
 ## 2026-04-15 12:09:07
 
 - Fix: If `ssh_known_hosts` (or default `~/.ssh/known_hosts`) is missing, the
