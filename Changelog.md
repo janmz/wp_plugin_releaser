@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-04-28 10:12:54
+
+- Fix: When appending a changelog note for an existing version, preserve the
+  existing section and prepend the new note as a bullet at the top (matching
+  `## [x.y.z]` and `## x.y.z` headers).
+
+## 2026-04-28 10:23:53
+
+- Change: SVG→PNG generation now creates a single `*-h1024.png` (height 1024px,
+  preserving aspect ratio) for files that are neither `banner*` nor
+  `logo*`/`icon*`.
+
+## 2026-04-28 10:42:57
+
+- Refactor: Moved the application entrypoint (`main.go`) back into
+  `wp_plugin_release.go` and removed `main.go`.
+
 ## 2026-04-15 21:01:02
 
 - Fix: `update_info.json` changelog now uses the latest 5 entries from
