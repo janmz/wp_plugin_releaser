@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-06-22 12:35:26
+
+- Change: Local CI checks and pre-commit hook use `go run ./scripts/cicheck`
+  (pure Go, no bash). On Windows: `scripts/install-hooks.ps1` or `make
+  install-hooks` builds `.githooks/pre-commit.exe`; on Unix a shell hook runs
+  `go run ./scripts/cicheck`.
+
+## 2026-06-22 12:28:09
+
+- Fix: CI workflow aligned with Go 1.25 (`go.mod`); golangci-lint now built via
+  `goinstall` to avoid version mismatch.
+- Fix: Go module cache path and bash `if`-syntax in the build workflow.
+- Feature: Pre-commit hook (`.githooks/pre-commit`) and `scripts/ci-check.sh`
+  mirror CI tests, i18n validation, and lint locally.
+
 ## 2026-04-28 10:12:54
 
 - Fix: When appending a changelog note for an existing version, preserve the

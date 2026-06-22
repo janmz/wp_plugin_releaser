@@ -12,13 +12,14 @@ package main
  * sconfig.go: Reading the config file with secure passwords
  * i18n.go: Internationalization of outputs and error messages
  *
- * Version: 1.3.1.65 (in version.go zu ändern)
+ * Version: 1.3.2.69 (in version.go zu ändern)
  *
  * Author: Jan Neuhaus, VAYA Consulting, https://vaya-consultig.de/development/ https://github.com/janmz
  *
  * Repository: https://github.com/janmz/wp_plugin_releaser
  *
  * ChangeLog:
+ *  22.06.26	1.3.2	Fix: include a pre commit hook to prevent ci-workflow failures
  *  28.04.26	1.3.1	Fix: existing version information not removed, but extended
  *  15.04.26	1.3.0	Feature: Include last five changes in the update_info.json
  *  15.04.26	1.2.15	Fix: changelog writes now always include a blank line at the end
@@ -41,7 +42,7 @@ package main
  *  12.08.25  	1.1.0	Provided via GitHub
  *  08.08.25  	1.0.0	First version created and tested
  *
- * (c)2025 Jan Neuhaus, VAYA Consulting
+ * (c)2025-2026 Jan Neuhaus, VAYA Consulting
  *
  */
 

@@ -114,14 +114,18 @@ test-i18n:
 	@echo "Testing English localization..."
 	LANG=en_US.UTF-8 ./bin/${BINARY_NAME} --help || true
 
-# Git Pre-commit Hook installieren
+# Git Pre-commit Hook installieren (Windows: pre-commit.exe, Unix: sh + go run)
 .PHONY: install-hooks
 install-hooks:
-	@echo "Installing git pre-commit hooks..."
-	@echo '#!/bin/sh' > .git/hooks/pre-commit
-	@echo 'make test i18n-validate' >> .git/hooks/pre-commit
-	@chmod +x .git/hooks/pre-commit
-	@echo "Pre-commit hook installed"
+	@git config core.hooksPath .githooks
+ifeq ($(OS),Windows_NT)
+	@go build -o .githooks/pre-commit.exe ./scripts/cicheck
+	@echo Pre-commit hook installed: .githooks/pre-commit.exe
+else
+	@printf '%s\n' '#!/bin/sh' 'cd "$$(git rev-parse --show-toplevel)" || exit 1' 'exec go run ./scripts/cicheck' > .githooks/pre-commit
+	@chmod +x .githooks/pre-commit
+	@echo Pre-commit hook installed: .githooks/pre-commit
+endif
 
 # Dokumentation generieren
 .PHONY: docs
@@ -144,17 +148,14 @@ update-deps:
 	go get -u ./...
 	go mod tidy
 
-# Code-Qualität prüfen
-.PHONY: lint
+# Code-Qualität prüfen (wie CI)
+.PHONY: ci lint
+ci:
+	@go run ./scripts/cicheck
+
 lint:
 	@echo "Running linters..."
-	@if command -v golangci-lint >/dev/null 2>&1; then \
-		golangci-lint run; \
-	else \
-		echo "golangci-lint not installed. Install with: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"; \
-		go vet ./...; \
-		go fmt ./...; \
-	fi
+	@go run github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.8 run --timeout=5m
 
 # Hilfe anzeigen
 .PHONY: help
@@ -170,8 +171,9 @@ help:
 	@echo "  release        - Create release packages"
 	@echo "  test-i18n      - Test localization"
 	@echo "  install-hooks  - Install git hooks"
+	@echo "  ci             - Run local CI checks (tests, i18n, lint)"
 	@echo "  docs           - Generate documentation"
 	@echo "  docker         - Build Docker image"
 	@echo "  update-deps    - Update dependencies"
-	@echo "  lint           - Run code linters
+	@echo "  lint           - Run code linters"
 	@echo "  help           - Show this help message"
