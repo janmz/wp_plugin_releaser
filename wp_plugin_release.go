@@ -12,13 +12,14 @@ package main
  * sconfig.go: Reading the config file with secure passwords
  * i18n.go: Internationalization of outputs and error messages
  *
- * Version: 1.6.0.78 (in version.go zu ändern)
+ * Version: 1.6.1.80 (in version.go zu ändern)
  *
  * Author: Jan Neuhaus, VAYA Consulting, https://vaya-consultig.de/development/ https://github.com/janmz
  *
  * Repository: https://github.com/janmz/wp_plugin_releaser
  *
  * ChangeLog:
+ *  24.06.26	1.6.1	Fix: ci workflow now working
  *  23.06.26	1.6.0	Fix: New -v or -verbose flag
  *  23.06.26	1.4.1	Fix: Really stop if github commit stops due to precommit task
  *  23.06.26	1.5.1	Fix: Really stop if github commit stops due to precommit task

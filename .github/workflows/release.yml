@@ -10,8 +10,13 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: write
+
 jobs:
   pipeline:
+    permissions:
+      contents: write
     uses: ./.github/workflows/pipeline.yml
     with:
       create_release: true

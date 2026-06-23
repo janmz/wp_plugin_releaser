@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.6.0.79] - 2026-06-24 00:07:21
+
+- Fix: `release.yml` grants `contents: write` to the reusable pipeline so the
+  GitHub Release job can create releases.
+
 ## [1.5.0.77] - 2026-06-23 21:05:28
 
 - Feature: `-v` / `-verbose` enables detailed output (system commands, opened
