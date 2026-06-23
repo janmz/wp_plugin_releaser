@@ -153,7 +153,7 @@ func gitCommitAndTag(workDir string, version string, changelogText string, commi
 	cmd := exec.Command("git", "add", "-A")
 	cmd.Dir = workDir
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("%s: %v", t("error.git_commit"), err)
+		return fmt.Errorf(t("error.git_commit"), err)
 	}
 
 	cmd = exec.Command("git", "commit", "-m", commitMessage)
@@ -162,7 +162,7 @@ func gitCommitAndTag(workDir string, version string, changelogText string, commi
 		cmd = exec.Command("git", "diff", "--cached", "--quiet")
 		cmd.Dir = workDir
 		if err2 := cmd.Run(); err2 != nil {
-			return fmt.Errorf("%s: %v", t("error.git_commit"), err)
+			return fmt.Errorf(t("error.git_commit"), err)
 		}
 	}
 
@@ -173,14 +173,14 @@ func gitCommitAndTag(workDir string, version string, changelogText string, commi
 		cmd = exec.Command("git", "pull")
 		cmd.Dir = workDir
 		if err2 := cmd.Run(); err2 != nil {
-			return fmt.Errorf("%s: %v", t("error.git_sync"), err2)
+			return fmt.Errorf(t("error.git_sync"), err2)
 		}
 	}
 
 	cmd = exec.Command("git", "push")
 	cmd.Dir = workDir
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("%s: %v", t("error.git_push"), err)
+		return fmt.Errorf(t("error.git_push"), err)
 	}
 
 	tagName := fmt.Sprintf("v%s", version)
@@ -199,7 +199,7 @@ func gitCommitAndTag(workDir string, version string, changelogText string, commi
 	cmd = exec.Command("git", "tag", "-a", tagName, "-m", commitMessage)
 	cmd.Dir = workDir
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("%s: %v", t("error.git_tag"), err)
+		return fmt.Errorf(t("error.git_tag"), err)
 	}
 
 	if tagExists {
@@ -211,7 +211,7 @@ func gitCommitAndTag(workDir string, version string, changelogText string, commi
 	cmd = exec.Command("git", "push", "origin", tagName)
 	cmd.Dir = workDir
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("%s: %v", t("error.git_tag"), err)
+		return fmt.Errorf(t("error.git_tag"), err)
 	}
 
 	return nil
@@ -221,7 +221,7 @@ func syncToRemote(workDir string) error {
 	cmd := exec.Command("git", "push")
 	cmd.Dir = workDir
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("%s: %v", t("error.git_push"), err)
+		return fmt.Errorf(t("error.git_push"), err)
 	}
 	return nil
 }

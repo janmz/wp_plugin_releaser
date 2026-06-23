@@ -12,13 +12,16 @@ package main
  * sconfig.go: Reading the config file with secure passwords
  * i18n.go: Internationalization of outputs and error messages
  *
- * Version: 1.4.0.72 (in version.go zu ändern)
+ * Version: 1.4.1.76 (in version.go zu ändern)
  *
  * Author: Jan Neuhaus, VAYA Consulting, https://vaya-consultig.de/development/ https://github.com/janmz
  *
  * Repository: https://github.com/janmz/wp_plugin_releaser
  *
  * ChangeLog:
+ *  23.06.26	1.4.1	Fix: Really stop if github commit stops due to precommit task
+ *  23.06.26	1.5.1	Fix: Really stop if github commit stops due to precommit task
+ *  23.06.26	1.5.0	Fix: Really stop if github commit stops due to precommit task
  *  23.06.26	1.4.0	Fix: better github workflows and using janmz/ssh-commands
  *  22.06.26	1.3.2	Fix: include a pre commit hook to prevent ci-workflow failures
  *  28.04.26	1.3.1	Fix: existing version information not removed, but extended
@@ -217,6 +220,7 @@ func main() {
 	err = handleGitHubIntegration(workDir, updateInfo, zipPath, commitMessage)
 	if err != nil {
 		logAndPrint(t("error.github_check", err))
+		os.Exit(1)
 	}
 
 	logAndPrint(t("app.release_process_completed"))

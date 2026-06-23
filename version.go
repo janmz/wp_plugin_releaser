@@ -1,6 +1,6 @@
 package main
 
 var (
-	Version   = "1.4.0.72" // Major, Minor, patch, Build
-	BuildTime = "2026-06-23 20:06:03"
+	Version   = "1.4.1.76" // Major, Minor, patch, Build
+	BuildTime = "2026-06-23 20:35:43"
 )
