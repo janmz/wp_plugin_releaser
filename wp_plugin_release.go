@@ -12,13 +12,14 @@ package main
  * sconfig.go: Reading the config file with secure passwords
  * i18n.go: Internationalization of outputs and error messages
  *
- * Version: 1.3.2.69 (in version.go zu ändern)
+ * Version: 1.4.0.72 (in version.go zu ändern)
  *
  * Author: Jan Neuhaus, VAYA Consulting, https://vaya-consultig.de/development/ https://github.com/janmz
  *
  * Repository: https://github.com/janmz/wp_plugin_releaser
  *
  * ChangeLog:
+ *  23.06.26	1.4.0	Fix: better github workflows and using janmz/ssh-commands
  *  22.06.26	1.3.2	Fix: include a pre commit hook to prevent ci-workflow failures
  *  28.04.26	1.3.1	Fix: existing version information not removed, but extended
  *  15.04.26	1.3.0	Feature: Include last five changes in the update_info.json
@@ -62,9 +63,9 @@ var logger *log.Logger
 var logFile *os.File
 var config ConfigType
 
-func parseCLIArgs(args []string) (workDir string, trustServer bool, commitMessage string) {
+func parseCLIArgs(args []string) (workDir string, fetchHostKey bool, commitMessage string) {
 	workDir = ""
-	trustServer = false
+	fetchHostKey = false
 	commitMessage = ""
 
 	for i := 0; i < len(args); i++ {
@@ -73,8 +74,8 @@ func parseCLIArgs(args []string) (workDir string, trustServer bool, commitMessag
 			continue
 		}
 		switch a {
-		case "-trustserver":
-			trustServer = true
+		case "-fetch-hostkey", "-trustserver":
+			fetchHostKey = true
 			continue
 		case "-c", "-commit":
 			if i+1 < len(args) {
@@ -91,7 +92,7 @@ func parseCLIArgs(args []string) (workDir string, trustServer bool, commitMessag
 			}
 		}
 	}
-	return workDir, trustServer, commitMessage
+	return workDir, fetchHostKey, commitMessage
 }
 
 func main() {
@@ -110,7 +111,7 @@ func main() {
 
 	fmt.Printf("%s, %s\n", t("app.executable_path", executablePath), t("app.version", Version, buildTimeStr))
 
-	workDir, trustServer, commitMessage := parseCLIArgs(os.Args[1:])
+	workDir, fetchHostKey, commitMessage := parseCLIArgs(os.Args[1:])
 
 	if workDir == "" {
 		var err2 error
@@ -162,14 +163,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	changelogText, err := processChangelog(workDir, currentVersion, updateInfo, commitMessage)
+	changelogText, err := processChangelog(workDir, currentVersion, commitMessage)
 	if err != nil {
 		logAndPrint(t("error.changelog_write", err))
 	} else if changelogText != "" {
 		updateChangelogInUpdateInfo(workDir, updateInfo, changelogText)
 	}
 
-	err = processSVGFiles(workDir, updateInfo)
+	err = processSVGFiles(workDir)
 	if err != nil {
 		logAndPrint(t("error.svg_convert", err))
 	}
@@ -203,7 +204,7 @@ func main() {
 	logAndPrint(t("log.zip_file_created", zipFileName))
 
 	if config.SSHHost != "" && config.SSHUser != "" {
-		err = uploadFiles(&config, zipPath, updateInfoPath, workDir, updateInfo, trustServer)
+		err = uploadFiles(&config, zipPath, updateInfoPath, workDir, updateInfo, fetchHostKey)
 		if err != nil {
 			logAndPrint(t("error.upload", err))
 		} else {

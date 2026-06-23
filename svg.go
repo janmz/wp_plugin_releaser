@@ -367,7 +367,7 @@ func filterExistingSVGsInUpdates(updatesDir string, svgFiles []string) []string 
 	return uniqueStrings(out)
 }
 
-func processSVGFiles(workDir string, updateInfo *UpdateInfo) error {
+func processSVGFiles(workDir string) error {
 	updatesDir := filepath.Join(workDir, "Updates")
 
 	if _, err := os.Stat(updatesDir); os.IsNotExist(err) {
@@ -423,4 +423,3 @@ func processSVGFiles(workDir string, updateInfo *UpdateInfo) error {
 	logAndPrint(t("log.svg_converted"))
 	return nil
 }
-

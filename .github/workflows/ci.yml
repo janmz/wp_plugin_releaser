@@ -1,0 +1,45 @@
+# CI für Branch-Pushes und Pull Requests (keine Tags – siehe release.yml).
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  skip-tagged-main:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      should_run: ${{ steps.check.outputs.should_run }}
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Skip CI when commit is released via tag
+      id: check
+      run: |
+        if git describe --exact-match --tags HEAD 2>/dev/null; then
+          echo "Commit has an exact tag; release workflow handles this push."
+          echo "should_run=false" >> $GITHUB_OUTPUT
+        else
+          echo "should_run=true" >> $GITHUB_OUTPUT
+        fi
+
+  pipeline:
+    needs: skip-tagged-main
+    if: |
+      always() && (
+        github.event_name == 'pull_request' ||
+        github.ref != 'refs/heads/main' ||
+        (needs.skip-tagged-main.result == 'success' && needs.skip-tagged-main.outputs.should_run == 'true')
+      )
+    uses: ./.github/workflows/pipeline.yml
+    with:
+      create_release: false
+    secrets: inherit

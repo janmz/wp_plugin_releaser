@@ -1,39 +1,37 @@
-# GitHub Actions Workflow für wp_plugin_release mit i18n Support
-name: Build and Release
+# Wiederverwendbare Pipeline: Tests, Build und optional GitHub Release.
+name: Pipeline
 
 on:
-  push:
-    branches: [ main, develop ]
-    tags:
-      - 'v*'
-  pull_request:
-    branches: [ main ]
+  workflow_call:
+    inputs:
+      create_release:
+        description: 'GitHub Release mit Build-Artefakten erstellen'
+        type: boolean
+        default: false
 
 env:
   GO_VERSION: '1.25'
   GOTOOLCHAIN: auto
-  
+
 jobs:
-  # Tests und Code-Qualität
   test:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
       with:
         fetch-depth: 0
-    
+
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
         go-version: ${{ env.GO_VERSION }}
         cache: true
-    
-    # sconfig ist per replace => ../sconfig eingebunden; in CI muss es geklont werden.
-    # Bei privatem sconfig-Repo: Secret REPO_ACCESS_TOKEN (PAT mit repo-Scope) anlegen.
+
     - name: Checkout sconfig (replace dependency)
       run: |
         cd "$GITHUB_WORKSPACE/.."
         git clone --depth 1 "https://x-access-token:${TOKEN}@github.com/janmz/sconfig.git"
+        git clone --depth 1 "https://x-access-token:${TOKEN}@github.com/janmz/ssh-commands.git"
       env:
         TOKEN: ${{ secrets.REPO_ACCESS_TOKEN || secrets.GITHUB_TOKEN }}
 
@@ -46,20 +44,20 @@ jobs:
         key: ${{ runner.os }}-${{ github.repository }}-go-mod-${{ hashFiles('**/go.sum') }}
         restore-keys: |
           ${{ runner.os }}-${{ github.repository }}-go-mod-
-    
+
     - name: Download dependencies
       run: go mod download
-    
+
     - name: Run tests
       run: go test -v -race -coverprofile=coverage.out ./...
-    
+
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
       with:
         file: ./coverage.out
         flags: unittests
         name: codecov-umbrella
-    
+
     - name: Run golangci-lint
       uses: golangci/golangci-lint-action@v6
       with:
@@ -67,20 +65,18 @@ jobs:
         install-mode: goinstall
         args: --timeout=5m
 
-  # i18n Validation
   i18n-validate:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
         go-version: ${{ env.GO_VERSION }}
-    
+
     - name: Validate translations
       run: |
-        # Überprüfen ob alle Übersetzungsdateien vorhanden sind
         if [ ! -f "locales/en.json" ]; then
           echo "Error: locales/en.json missing"
           exit 1
@@ -89,14 +85,10 @@ jobs:
           echo "Error: locales/de.json missing"
           exit 1
         fi
-        
-        # JSON-Syntax validieren
         python3 -m json.tool locales/en.json > /dev/null
         python3 -m json.tool locales/de.json > /dev/null
-        
         echo "i18n validation passed"
 
-  # Build für alle Plattformen
   build:
     needs: [test, i18n-validate]
     runs-on: ubuntu-latest
@@ -105,10 +97,9 @@ jobs:
         goos: [linux, windows, darwin]
         goarch: [amd64, arm64]
         exclude:
-          # Windows ARM64 noch nicht gut unterstützt
           - goos: windows
             goarch: arm64
-    
+
     steps:
     - uses: actions/checkout@v4
       with:
@@ -118,6 +109,7 @@ jobs:
       run: |
         cd "$GITHUB_WORKSPACE/.."
         git clone --depth 1 "https://x-access-token:${TOKEN}@github.com/janmz/sconfig.git"
+        git clone --depth 1 "https://x-access-token:${TOKEN}@github.com/janmz/ssh-commands.git"
       env:
         TOKEN: ${{ secrets.REPO_ACCESS_TOKEN || secrets.GITHUB_TOKEN }}
 
@@ -126,7 +118,7 @@ jobs:
       with:
         go-version: ${{ env.GO_VERSION }}
         cache: true
-    
+
     - name: Get version
       id: version
       run: |
@@ -138,7 +130,7 @@ jobs:
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "build_time=$(date '+%Y-%m-%d %H:%M:%S')" >> $GITHUB_OUTPUT
         echo "git_commit=$GITHUB_SHA" >> $GITHUB_OUTPUT
-    
+
     - name: Build binary
       env:
         GOOS: ${{ matrix.goos }}
@@ -152,15 +144,14 @@ jobs:
             find . -name "*.syso" -delete
           fi
         else
-          # Remove .syso-files that are used only for windows
           find . -name "*.syso" -delete
         fi
-        
+
         go build \
           -ldflags "-s -w -X main.Version=${{ steps.version.outputs.version }} -X 'main.BuildTime=${{ steps.version.outputs.build_time }}' -X main.GitCommit=${{ steps.version.outputs.git_commit }}" \
           -o "bin/${BINARY_NAME}" \
           .
-    
+
     - name: Create release package
       run: |
         BINARY_NAME="wp_plugin_release"
@@ -170,57 +161,45 @@ jobs:
             find . -name "*.syso" -delete
           fi
         else
-          # Remove .syso-files that are used only for windows
           find . -name "*.syso" -delete
         fi
-        
+
         PACKAGE_NAME="wp_plugin_release-${{ steps.version.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}"
-        
-        # Paket-Verzeichnis erstellen
+
         mkdir -p "dist/$PACKAGE_NAME"
-        
-        # Binary kopieren
         cp "bin/$BINARY_NAME" "dist/$PACKAGE_NAME/"
-        
-        # Dokumentation und Übersetzungen kopieren
         cp README.md "dist/$PACKAGE_NAME/"
         cp LICENSE "dist/$PACKAGE_NAME/"
         cp SECURITY.md "dist/$PACKAGE_NAME/"
         cp -r locales "dist/$PACKAGE_NAME/"
-        
-        # Archive erstellen
+
         cd dist
         if [ "${{ matrix.goos }}" = "windows" ]; then
           zip -r "$PACKAGE_NAME.zip" "$PACKAGE_NAME"
-          echo "ASSET_PATH=dist/$PACKAGE_NAME.zip" >> $GITHUB_ENV
-          echo "ASSET_NAME=$PACKAGE_NAME.zip" >> $GITHUB_ENV
         else
           tar -czf "$PACKAGE_NAME.tar.gz" "$PACKAGE_NAME"
-          echo "ASSET_PATH=dist/$PACKAGE_NAME.tar.gz" >> $GITHUB_ENV
-          echo "ASSET_NAME=$PACKAGE_NAME.tar.gz" >> $GITHUB_ENV
         fi
-    
+
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
       with:
         name: wp_plugin_release-${{ matrix.goos }}-${{ matrix.goarch }}
-        path: ${{ env.ASSET_PATH }}
+        path: dist/wp_plugin_release-${{ steps.version.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.goos == 'windows' && '.zip' || '.tar.gz' }}
 
-  # Release erstellen (nur bei Tags)
   release:
-    if: startsWith(github.ref, 'refs/tags/')
+    if: inputs.create_release
     needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Download all artifacts
       uses: actions/download-artifact@v4
       with:
         path: artifacts
-    
+
     - name: Create release
       uses: softprops/action-gh-release@v2
       with:
@@ -231,22 +210,21 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # Sicherheits-Scan
   security:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
 
-      - name: Install gosec
-        run: go install github.com/securego/gosec/v2/cmd/gosec@latest
-        
-      - name: Run gosec
-        uses: securego/gosec@v2.19.0
-        with:
-          args: ./...
-        continue-on-error: true
+    - name: Install gosec
+      run: go install github.com/securego/gosec/v2/cmd/gosec@latest
+
+    - name: Run gosec
+      uses: securego/gosec@v2.19.0
+      with:
+        args: ./...
+      continue-on-error: true

@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 )
 
 func init() {
@@ -241,13 +240,6 @@ func TestProcessUpdateInfo_NoChangeWhenNewer(ts *testing.T) {
 	if ui.Version != "2.0.0" {
 		ts.Fatalf("version should remain 2.0.0, got %s", ui.Version)
 	}
-}
-
-func TestCreateRemoteDirCommandEscapes(t *testing.T) {
-	// This function requires a real ssh.Client; instead, test the command format indirectly by ensuring
-	// uploadFileViaSFTP uses ToSlash and mkdir -p path formatting. We cannot instantiate ssh.Client here.
-	// This test is intentionally a no-op placeholder to document limitation of pure unit tests for SSH.
-	_ = time.Now()
 }
 
 func TestSafeJoinWithinBase(ts *testing.T) {

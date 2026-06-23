@@ -279,7 +279,7 @@ func promptChangelogText(version string, existingText string, changedFiles []str
 	return text, nil
 }
 
-func processChangelog(workDir string, version string, updateInfo *UpdateInfo, textOverride string) (string, error) {
+func processChangelog(workDir string, version string, textOverride string) (string, error) {
 	logAndPrint(t("log.changelog_reading", version))
 
 	existingText, err := readChangelog(workDir, version)
@@ -444,4 +444,3 @@ func updateChangelogInUpdateInfo(workDir string, updateInfo *UpdateInfo, changel
 	updateInfo.Sections["changelog"] = htmlText
 	logAndPrint(t("log.changelog_in_update_info"))
 }
-

@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-06-23 09:52:10
+
+- Refactor: SSH upload now uses `github.com/janmz/ssh-commands` instead of
+  local `ssh.go` SFTP code.
+- Change: SSH host key verification is always required; use `ssh_known_hosts`
+  (or `~/.ssh/known_hosts`) or start with `-fetch-hostkey` to fetch and store
+  the server key. `-trustserver` remains as an alias for `-fetch-hostkey`.
+
+## 2026-06-22 14:40:32
+
+- Fix: GitHub Actions split into `ci.yml` (branches/PR) and `release.yml` (tags
+  only) to avoid duplicate workflow runs when pushing to `main` and a `v*` tag.
+  Tagged commits on `main` skip the CI workflow; the release workflow handles
+  them.
+
 ## 2026-06-22 12:35:26
 
 - Change: Local CI checks and pre-commit hook use `go run ./scripts/cicheck`

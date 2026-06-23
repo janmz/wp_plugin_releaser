@@ -107,26 +107,33 @@ wp_plugin_release /pfad/zum/plugin
 | `ssh_port` | SSH-Port (Standard: 22) | ✅ |
 | `ssh_dir_base` | Basisverzeichnis auf dem Server | ✅ |
 | `ssh_user` | SSH-Benutzername | ✅ |
-| `ssh_key_file` | Pfad zum SSH-Private-Key oder zur `known_hosts`-Datei | ❌ |
+| `ssh_key_file` | Pfad zum SSH-Private-Key | ❌ |
+| `ssh_known_hosts` | Pfad zur OpenSSH-`known_hosts`-Datei | ✅ (oder `-fetch-hostkey`) |
 | `ssh_password` | SSH-Passwort (nach erstem Einsatz verschlüsselt) | ✅ |
 
-### SSH-Host-Key-Prüfung (optional, empfohlen)
+### SSH-Host-Key-Prüfung (Pflicht)
 
-Wenn `ssh_key_file` auf eine `known_hosts`-Datei zeigt und die Datei existiert, wird die
-Host-Key-Prüfung für die SSH-Verbindung aktiviert. Falls die Datei nicht
-existiert, läuft das Tool weiterhin ohne Host-Key-Prüfung.
+Für den SSH-Upload ist eine Host-Key-Prüfung über `ssh_known_hosts` oder die
+Standarddatei `~/.ssh/known_hosts` erforderlich. Fehlt die Datei oder der
+Server-Key, einmalig mit `-fetch-hostkey` starten:
 
-Eine known_hosts-Datei kannst du so erzeugen/ergänzen:
+```bash
+wp_plugin_release -fetch-hostkey /pfad/zum/plugin
+```
+
+`-trustserver` bleibt als Alias für `-fetch-hostkey` erhalten.
+
+Manuell kannst du eine known_hosts-Datei so erzeugen:
 
 ```bash
 ssh-keyscan -p 22 dein-server.example.com >> known_hosts
 ```
 
-Danach kann in der Konfiguration z. B. stehen:
+Beispiel-Konfiguration:
 
 ```json
 {
-  "ssh_key_file": "known_hosts"
+  "ssh_known_hosts": "known_hosts"
 }
 ```
 

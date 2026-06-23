@@ -1,0 +1,18 @@
+# Release-Build nur bei Tag-Push (v*). Kein doppelter Lauf mit Branch-CI.
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pipeline:
+    uses: ./.github/workflows/pipeline.yml
+    with:
+      create_release: true
+    secrets: inherit

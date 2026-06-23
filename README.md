@@ -106,26 +106,33 @@ wp_plugin_release /path/to/plugin
 | `ssh_port` | SSH port (default: 22) | ✅ |
 | `ssh_dir_base` | Base directory on server | ✅ |
 | `ssh_user` | SSH username | ✅ |
-| `ssh_key_file` | Path to SSH private key or `known_hosts` file | ❌ |
+| `ssh_key_file` | Path to SSH private key | ❌ |
+| `ssh_known_hosts` | Path to OpenSSH `known_hosts` file | ✅ (or `-fetch-hostkey`) |
 | `ssh_password` | SSH password (encrypted after first use) | ✅ |
 
-### SSH Host Key Verification (Optional but Recommended)
+### SSH Host Key Verification (Required)
 
-If `ssh_key_file` points to a `known_hosts` file and the file exists, host key verification is
-enabled for the SSH connection. If the file does not exist, the tool continues
-without host key verification.
+SSH upload requires host key verification via `ssh_known_hosts` or the default
+`~/.ssh/known_hosts`. If the file is missing or does not contain the server key,
+run once with `-fetch-hostkey` to fetch and append the key:
 
-Create/update a known hosts file with:
+```bash
+wp_plugin_release -fetch-hostkey /path/to/plugin
+```
+
+`-trustserver` is kept as an alias for `-fetch-hostkey`.
+
+Create a known hosts file manually with:
 
 ```bash
 ssh-keyscan -p 22 your-server.example.com >> known_hosts
 ```
 
-You can then set:
+Example config:
 
 ```json
 {
-  "ssh_key_file": "known_hosts"
+  "ssh_known_hosts": "known_hosts"
 }
 ```
 
