@@ -12,13 +12,14 @@ package main
  * sconfig.go: Reading the config file with secure passwords
  * i18n.go: Internationalization of outputs and error messages
  *
- * Version: 1.4.1.76 (in version.go zu ändern)
+ * Version: 1.6.0.78 (in version.go zu ändern)
  *
  * Author: Jan Neuhaus, VAYA Consulting, https://vaya-consultig.de/development/ https://github.com/janmz
  *
  * Repository: https://github.com/janmz/wp_plugin_releaser
  *
  * ChangeLog:
+ *  23.06.26	1.6.0	Fix: New -v or -verbose flag
  *  23.06.26	1.4.1	Fix: Really stop if github commit stops due to precommit task
  *  23.06.26	1.5.1	Fix: Really stop if github commit stops due to precommit task
  *  23.06.26	1.5.0	Fix: Really stop if github commit stops due to precommit task
@@ -66,10 +67,11 @@ var logger *log.Logger
 var logFile *os.File
 var config ConfigType
 
-func parseCLIArgs(args []string) (workDir string, fetchHostKey bool, commitMessage string) {
+func parseCLIArgs(args []string) (workDir string, fetchHostKey bool, commitMessage string, verboseFlag bool) {
 	workDir = ""
 	fetchHostKey = false
 	commitMessage = ""
+	verboseFlag = false
 
 	for i := 0; i < len(args); i++ {
 		a := strings.TrimSpace(args[i])
@@ -79,6 +81,9 @@ func parseCLIArgs(args []string) (workDir string, fetchHostKey bool, commitMessa
 		switch a {
 		case "-fetch-hostkey", "-trustserver":
 			fetchHostKey = true
+			continue
+		case "-v", "-verbose":
+			verboseFlag = true
 			continue
 		case "-c", "-commit":
 			if i+1 < len(args) {
@@ -95,10 +100,11 @@ func parseCLIArgs(args []string) (workDir string, fetchHostKey bool, commitMessa
 			}
 		}
 	}
-	return workDir, fetchHostKey, commitMessage
+	return workDir, fetchHostKey, commitMessage, verboseFlag
 }
 
 func main() {
+	
 	executablePath, err := os.Executable()
 	if err != nil {
 		executablePath = os.Args[0]
@@ -114,7 +120,8 @@ func main() {
 
 	fmt.Printf("%s, %s\n", t("app.executable_path", executablePath), t("app.version", Version, buildTimeStr))
 
-	workDir, fetchHostKey, commitMessage := parseCLIArgs(os.Args[1:])
+	workDir, fetchHostKey, commitMessage, verboseFlag := parseCLIArgs(os.Args[1:])
+	verbose = verboseFlag
 
 	if workDir == "" {
 		var err2 error
@@ -138,6 +145,10 @@ func main() {
 	initLogging(workDir)
 	defer logFile.Close()
 
+	if verbose {
+		logAndPrint(t("log.verbose_enabled"))
+	}
+
 	err = sconfig.LoadConfig(&config, 2, updateConfigPath, false, false)
 	if err != nil {
 		logAndPrint(t("error.config_read", err))
@@ -151,7 +162,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	logAndPrint(t("app.working_directory", workDir))
+	logVerbose(t("app.working_directory", workDir))
 
 	currentVersion, err := processMainPHPFile(workDir, config.MainPHPFile, updateInfo)
 	if err != nil {
@@ -197,7 +208,7 @@ func main() {
 		os.Exit(1)
 	}
 	updateInfo.DownloadURL = strings.TrimSuffix(updateInfo.DownloadURL, remoteZIPName) + zipFileName
-	logAndPrint(t("log.download_url_set", redactSensitiveURL(updateInfo.DownloadURL)))
+	logVerbose(t("log.download_url_set", redactSensitiveURL(updateInfo.DownloadURL)))
 
 	err = setUpdateInfo(updateInfo, allData, updateInfoPath)
 	if err != nil {

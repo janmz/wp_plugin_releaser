@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -14,18 +13,18 @@ func promptGitHubUpdate() bool {
 	if autoUpdate := os.Getenv("AUTO_GITHUB_UPDATE"); autoUpdate != "" {
 		text := strings.ToLower(strings.TrimSpace(autoUpdate))
 		if text == "yes" || text == "y" || text == "j" || text == "ja" {
-			logAndPrint("Auto-approving GitHub update (AUTO_GITHUB_UPDATE is set)")
+			logVerbose("Auto-approving GitHub update (AUTO_GITHUB_UPDATE is set)")
 			return true
 		}
 	}
 
 	if os.Getenv("SKIP_GITHUB_UPDATE") != "" {
-		logAndPrint("Skipping GitHub update (SKIP_GITHUB_UPDATE is set)")
+		logVerbose("Skipping GitHub update (SKIP_GITHUB_UPDATE is set)")
 		return false
 	}
 
 	if !isInteractiveTerminal() {
-		logAndPrint("Non-interactive terminal detected, skipping GitHub update")
+		logVerbose("Non-interactive terminal detected, skipping GitHub update")
 		return false
 	}
 
@@ -33,7 +32,7 @@ func promptGitHubUpdate() bool {
 	reader := bufio.NewReader(os.Stdin)
 	input, err := reader.ReadString('\n')
 	if err != nil {
-		logAndPrint("Error reading input, skipping GitHub update")
+		logVerbose("Error reading input, skipping GitHub update")
 		return false
 	}
 
@@ -47,14 +46,14 @@ func handleGitHubIntegration(workDir string, updateInfo *UpdateInfo, zipPath str
 		return err
 	}
 	if !isGitHub {
-		logAndPrint(t("log.github_no_repo"))
+		logVerbose(t("log.github_no_repo"))
 		return nil
 	}
 
-	logAndPrint(t("log.github_repo_detected"))
+	logVerbose(t("log.github_repo_detected"))
 
 	if !promptGitHubUpdate() {
-		logAndPrint("GitHub update skipped by user")
+		logVerbose("GitHub update skipped by user")
 		return nil
 	}
 
@@ -75,7 +74,7 @@ func handleGitHubIntegration(workDir string, updateInfo *UpdateInfo, zipPath str
 		}
 	}
 	if version == "" {
-		logAndPrint("Could not determine version for GitHub update")
+		logVerbose("Could not determine version for GitHub update")
 		return nil
 	}
 
@@ -85,32 +84,33 @@ func handleGitHubIntegration(workDir string, updateInfo *UpdateInfo, zipPath str
 		return err
 	}
 	if tagExists {
-		logAndPrint(t("log.git_tag_exists", version))
+		logVerbose(t("log.git_tag_exists", version))
 	} else {
-		logAndPrint(t("log.git_tag_not_exists", version))
+		logVerbose(t("log.git_tag_not_exists", version))
 	}
 
-	logAndPrint(t("log.git_committing"))
+	logVerbose(t("log.git_committing"))
 	err = gitCommitAndTag(workDir, version, changelogText, commitMessageOverride)
 	if err != nil {
 		logAndPrint(t("error.git_commit", err))
 		return err
 	}
 
-	logAndPrint(t("log.git_tagging", version))
-	logAndPrint(t("log.git_pushing"))
+	logVerbose(t("log.git_tagging", version))
+	logVerbose(t("log.git_pushing"))
 	err = syncToRemote(workDir)
 	if err != nil {
 		logAndPrint(t("error.git_push", err))
 		return err
 	}
 
-	logAndPrint(t("log.git_completed"))
+	logVerbose(t("log.git_completed"))
 	return nil
 }
 
 func isGitHubRepository(workDir string) (bool, error) {
 	gitConfigPath := filepath.Join(workDir, ".git", "config")
+	logOpenedFile(gitConfigPath)
 	if _, err := os.Stat(gitConfigPath); os.IsNotExist(err) {
 		return false, nil
 	}
@@ -131,9 +131,7 @@ func checkGitTagExists(workDir string, version string) (bool, error) {
 	}
 
 	tagName := fmt.Sprintf("v%s", version)
-	cmd := exec.Command("git", "tag", "-l", tagName)
-	cmd.Dir = workDir
-	output, err := cmd.Output()
+	output, err := runGitCommandOutput(workDir, "tag", "-l", tagName)
 	if err != nil {
 		return false, err
 	}
@@ -150,36 +148,24 @@ func gitCommitAndTag(workDir string, version string, changelogText string, commi
 		commitMessage = fmt.Sprintf("Release version %s", version)
 	}
 
-	cmd := exec.Command("git", "add", "-A")
-	cmd.Dir = workDir
-	if err := cmd.Run(); err != nil {
+	if err := runGitCommand(workDir, "add", "-A"); err != nil {
 		return fmt.Errorf(t("error.git_commit"), err)
 	}
 
-	cmd = exec.Command("git", "commit", "-m", commitMessage)
-	cmd.Dir = workDir
-	if err := cmd.Run(); err != nil {
-		cmd = exec.Command("git", "diff", "--cached", "--quiet")
-		cmd.Dir = workDir
-		if err2 := cmd.Run(); err2 != nil {
+	if err := runGitCommand(workDir, "commit", "-m", commitMessage); err != nil {
+		if err2 := runGitCommand(workDir, "diff", "--cached", "--quiet"); err2 != nil {
 			return fmt.Errorf(t("error.git_commit"), err)
 		}
 	}
 
-	logAndPrint(t("log.git_syncing"))
-	cmd = exec.Command("git", "pull", "--rebase")
-	cmd.Dir = workDir
-	if err := cmd.Run(); err != nil {
-		cmd = exec.Command("git", "pull")
-		cmd.Dir = workDir
-		if err2 := cmd.Run(); err2 != nil {
+	logVerbose(t("log.git_syncing"))
+	if err := runGitCommand(workDir, "pull", "--rebase"); err != nil {
+		if err2 := runGitCommand(workDir, "pull"); err2 != nil {
 			return fmt.Errorf(t("error.git_sync"), err2)
 		}
 	}
 
-	cmd = exec.Command("git", "push")
-	cmd.Dir = workDir
-	if err := cmd.Run(); err != nil {
+	if err := runGitCommand(workDir, "push"); err != nil {
 		return fmt.Errorf(t("error.git_push"), err)
 	}
 
@@ -191,26 +177,18 @@ func gitCommitAndTag(workDir string, version string, changelogText string, commi
 	}
 
 	if tagExists {
-		cmd = exec.Command("git", "tag", "-d", tagName)
-		cmd.Dir = workDir
-		_ = cmd.Run() //nolint:errcheck
+		_ = runGitCommand(workDir, "tag", "-d", tagName) //nolint:errcheck
 	}
 
-	cmd = exec.Command("git", "tag", "-a", tagName, "-m", commitMessage)
-	cmd.Dir = workDir
-	if err := cmd.Run(); err != nil {
+	if err := runGitCommand(workDir, "tag", "-a", tagName, "-m", commitMessage); err != nil {
 		return fmt.Errorf(t("error.git_tag"), err)
 	}
 
 	if tagExists {
-		cmd = exec.Command("git", "push", "origin", ":refs/tags/"+tagName)
-		cmd.Dir = workDir
-		_ = cmd.Run() //nolint:errcheck
+		_ = runGitCommand(workDir, "push", "origin", ":refs/tags/"+tagName) //nolint:errcheck
 	}
 
-	cmd = exec.Command("git", "push", "origin", tagName)
-	cmd.Dir = workDir
-	if err := cmd.Run(); err != nil {
+	if err := runGitCommand(workDir, "push", "origin", tagName); err != nil {
 		return fmt.Errorf(t("error.git_tag"), err)
 	}
 
@@ -218,11 +196,8 @@ func gitCommitAndTag(workDir string, version string, changelogText string, commi
 }
 
 func syncToRemote(workDir string) error {
-	cmd := exec.Command("git", "push")
-	cmd.Dir = workDir
-	if err := cmd.Run(); err != nil {
+	if err := runGitCommand(workDir, "push"); err != nil {
 		return fmt.Errorf(t("error.git_push"), err)
 	}
 	return nil
 }
-

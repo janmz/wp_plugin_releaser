@@ -15,11 +15,11 @@ import (
 type sshLog struct{}
 
 func (sshLog) Info(format string, args ...interface{}) {
-	logAndPrint(fmt.Sprintf(format, args...))
+	logVerbose(fmt.Sprintf(format, args...))
 }
 
 func (sshLog) Warn(format string, args ...interface{}) {
-	logAndPrint(fmt.Sprintf(format, args...))
+	logVerbose(fmt.Sprintf(format, args...))
 }
 
 func configToSSHOpts(config *ConfigType) (*sshcommands.Opts, error) {
@@ -42,18 +42,18 @@ func configToSSHOpts(config *ConfigType) (*sshcommands.Opts, error) {
 		keyPath := config.SSHKeyFile
 		key, err := os.ReadFile(keyPath)
 		if err != nil {
-			logAndPrint(t("log.ssh_key_warning", err))
+			logVerbose(t("log.ssh_key_warning", err))
 		} else if _, err := ssh.ParsePrivateKey(key); err != nil {
-			logAndPrint(t("log.ssh_key_parse_warning", err))
+			logVerbose(t("log.ssh_key_parse_warning", err))
 		} else {
 			opts.KeyFile = keyPath
-			logAndPrint(t("log.ssh_key_added"))
+			logVerbose(t("log.ssh_key_added"))
 		}
 	}
 
 	if config.SSHPassword != "" {
 		opts.Password = config.SSHPassword
-		logAndPrint(t("log.ssh_password_added"))
+		logVerbose(t("log.ssh_password_added"))
 	}
 
 	if opts.KeyFile == "" && opts.Password == "" {
@@ -78,7 +78,7 @@ func resolveKnownHostsPath(config *ConfigType, workDir string) string {
 }
 
 func uploadFiles(config *ConfigType, zipPath, updateInfoPath string, workDir string, updateInfo *UpdateInfo, fetchHostKey bool) error {
-	logAndPrint(t("log.ssh_upload_start"))
+	logVerbose(t("log.ssh_upload_start"))
 
 	opts, err := configToSSHOpts(config)
 	if err != nil {
@@ -95,7 +95,7 @@ func uploadFiles(config *ConfigType, zipPath, updateInfoPath string, workDir str
 		port = 22
 	}
 	addr := fmt.Sprintf("%s:%d", opts.Host, port)
-	logAndPrint(t("log.ssh_connecting", addr))
+	logVerbose(t("log.ssh_connecting", addr))
 
 	log := sshLog{}
 	client, err := sshcommands.DialKnownHosts(opts, sshcommands.KnownHostsOptions{
@@ -110,16 +110,16 @@ func uploadFiles(config *ConfigType, zipPath, updateInfoPath string, workDir str
 		return fmt.Errorf(t("error.ssh_connection"), err)
 	}
 	defer client.Close()
-	logAndPrint(t("log.ssh_connected"))
+	logVerbose(t("log.ssh_connected"))
 
 	remoteLocalPath, err := parseRemotePath(updateInfo.DownloadURL, config.SSHDirBase)
 	if err != nil {
 		return err
 	}
-	logAndPrint(t("log.remote_path", remoteLocalPath))
+	logVerbose(t("log.remote_path", remoteLocalPath))
 
 	if err := sshcommands.MkdirAllRemote(client, remoteLocalPath, log); err != nil {
-		logAndPrint(t("log.remote_dir_warning", err))
+		logVerbose(t("log.remote_dir_warning", err))
 	}
 
 	if err := sshcommands.UploadFileIfNewer(client, zipPath, filepath.Join(remoteLocalPath, filepath.Base(zipPath)), log); err != nil {
@@ -137,7 +137,7 @@ func uploadFiles(config *ConfigType, zipPath, updateInfoPath string, workDir str
 				bannerFilename := filepath.Base(bannerURL)
 				localBannerPath := filepath.Join(updatePath, bannerFilename)
 				if _, err := os.Stat(localBannerPath); os.IsNotExist(err) {
-					logAndPrint(t("log.banner_not_found", key, localBannerPath))
+					logVerbose(t("log.banner_not_found", key, localBannerPath))
 				} else {
 					remoteBannerPath := filepath.Join(remoteLocalPath, bannerFilename)
 					if err := sshcommands.UploadFileIfNewer(client, localBannerPath, remoteBannerPath, log); err != nil {
@@ -145,7 +145,7 @@ func uploadFiles(config *ConfigType, zipPath, updateInfoPath string, workDir str
 					}
 				}
 			} else {
-				logAndPrint(t("log.banner_no_url", key, redactSensitiveURL(bannerURL)))
+				logVerbose(t("log.banner_no_url", key, redactSensitiveURL(bannerURL)))
 			}
 		}
 	}
@@ -155,7 +155,7 @@ func uploadFiles(config *ConfigType, zipPath, updateInfoPath string, workDir str
 				iconFilename := filepath.Base(iconURL)
 				localIconPath := filepath.Join(updatePath, iconFilename)
 				if _, err := os.Stat(localIconPath); os.IsNotExist(err) {
-					logAndPrint(t("log.icon_not_found", key, localIconPath))
+					logVerbose(t("log.icon_not_found", key, localIconPath))
 				} else {
 					remoteIconPath := filepath.Join(remoteLocalPath, iconFilename)
 					if err := sshcommands.UploadFileIfNewer(client, localIconPath, remoteIconPath, log); err != nil {
@@ -163,7 +163,7 @@ func uploadFiles(config *ConfigType, zipPath, updateInfoPath string, workDir str
 					}
 				}
 			} else {
-				logAndPrint(t("log.icon_no_url", key, redactSensitiveURL(iconURL)))
+				logVerbose(t("log.icon_no_url", key, redactSensitiveURL(iconURL)))
 			}
 		}
 	}

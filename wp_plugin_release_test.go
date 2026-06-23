@@ -279,3 +279,26 @@ func TestRedactSensitiveURL(ts *testing.T) {
 		ts.Fatalf("unexpected redacted url: %s", redacted)
 	}
 }
+
+func TestParseCLIArgsVerbose(ts *testing.T) {
+	workDir, fetchHostKey, commitMessage, verboseFlag := parseCLIArgs([]string{
+		"-verbose", "-fetch-hostkey", "-c", "release msg", "/tmp/plugin",
+	})
+	if !verboseFlag {
+		ts.Fatal("expected verbose flag")
+	}
+	if !fetchHostKey {
+		ts.Fatal("expected fetchHostKey")
+	}
+	if commitMessage != "release msg" {
+		ts.Fatalf("commitMessage=%q", commitMessage)
+	}
+	if workDir != "/tmp/plugin" {
+		ts.Fatalf("workDir=%q", workDir)
+	}
+
+	_, _, _, verboseFlag = parseCLIArgs([]string{"-v", "."})
+	if !verboseFlag {
+		ts.Fatal("expected -v to enable verbose")
+	}
+}

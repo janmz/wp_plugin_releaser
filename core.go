@@ -76,7 +76,8 @@ func marshalWithoutHTMLescaping(data interface{}) ([]byte, error) {
 
 // getUpdateInfo reads the update_info.json and preserves unknown fields.
 func getUpdateInfo(updateInfoPath string) (*UpdateInfo, map[string]interface{}, error) {
-	logAndPrint(t("log.reading_update_info", updateInfoPath))
+	logVerbose(t("log.reading_update_info", updateInfoPath))
+	logOpenedFile(updateInfoPath)
 
 	if _, err := os.Stat(updateInfoPath); os.IsNotExist(err) {
 		return nil, nil, fmt.Errorf("%s", t("error.update_info_missing"))
@@ -97,12 +98,12 @@ func getUpdateInfo(updateInfoPath string) (*UpdateInfo, map[string]interface{}, 
 		return nil, nil, fmt.Errorf(t("error.update_info_structure"), err)
 	}
 
-	logAndPrint(t("log.current_version_update_info", updateInfo.Version))
+	logVerbose(t("log.current_version_update_info", updateInfo.Version))
 	return &updateInfo, allData, nil
 }
 
 func processUpdateInfo(updateInfo *UpdateInfo, currentVersion string) error {
-	logAndPrint(t("log.processing_update_info"))
+	logVerbose(t("log.processing_update_info"))
 
 	if getHigherVersion(updateInfo.Version, currentVersion) == currentVersion &&
 		updateInfo.Version != currentVersion {
@@ -136,13 +137,14 @@ func setUpdateInfo(updateInfo *UpdateInfo, allData map[string]interface{}, updat
 	if err := os.Rename(updateInfoPath, backupFilePath); err != nil {
 		return fmt.Errorf(t("error.backup_create"), err)
 	}
-	logAndPrint(t("log.update_info_backup", backupFilePath))
+	logVerbose(t("log.update_info_backup", backupFilePath))
+	logOpenedFile(updateInfoPath)
 
 	if err := os.WriteFile(updateInfoPath, updatedData, 0600); err != nil {
 		return fmt.Errorf("%s", t("error.update_info_write_file", err))
 	}
 
-	logAndPrint(t("log.update_info_updated", updateInfo.Version))
+	logVerbose(t("log.update_info_updated", updateInfo.Version))
 	return nil
 }
 
@@ -151,7 +153,8 @@ func createZipFile(sourceDir, zipPath string, skipPatterns []string, slug string
 		return err
 	}
 
-	logAndPrint(t("log.creating_zip", zipPath))
+	logVerbose(t("log.creating_zip", zipPath))
+	logOpenedFile(zipPath)
 
 	zipFile, err := os.Create(zipPath) // # nosec G304
 	if err != nil {
@@ -173,7 +176,7 @@ func createZipFile(sourceDir, zipPath string, skipPatterns []string, slug string
 	}
 
 	allSkipPatterns := append(defaultSkipPatterns, skipPatterns...)
-	logAndPrint(t("log.skip_patterns", allSkipPatterns))
+	logVerbose(t("log.skip_patterns", allSkipPatterns))
 
 	err = filepath.Walk(sourceDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -190,10 +193,10 @@ func createZipFile(sourceDir, zipPath string, skipPatterns []string, slug string
 
 		if shouldSkip(relPath, allSkipPatterns) {
 			if info.IsDir() {
-				logAndPrint(t("log.skip_directory", relPath))
+				logVerbose(t("log.skip_directory", relPath))
 				return filepath.SkipDir
 			}
-			logAndPrint(t("log.skip_file", relPath))
+			logVerbose(t("log.skip_file", relPath))
 			return nil
 		}
 
@@ -206,6 +209,7 @@ func createZipFile(sourceDir, zipPath string, skipPatterns []string, slug string
 			return err
 		}
 
+		logOpenedFile(path)
 		fileContent, err := os.Open(path) // # nosec G304
 		if err != nil {
 			return err
@@ -216,14 +220,14 @@ func createZipFile(sourceDir, zipPath string, skipPatterns []string, slug string
 			return err
 		}
 
-		logAndPrint(t("log.file_added", relPath))
+		logVerbose(t("log.file_added", relPath))
 		return nil
 	})
 	if err != nil {
 		return fmt.Errorf(t("error.walk_files"), err)
 	}
 
-	logAndPrint(t("log.zip_created"))
+	logVerbose(t("log.zip_created"))
 	return nil
 }
 
@@ -250,7 +254,8 @@ func processMainPHPFile(workDir, mainPHPFile string, updateInfo *UpdateInfo) (st
 	if err != nil {
 		return "", err
 	}
-	logAndPrint(t("log.processing_php", phpFilePath))
+	logVerbose(t("log.processing_php", phpFilePath))
+	logOpenedFile(phpFilePath)
 
 	content, err := os.ReadFile(phpFilePath) // # nosec G304
 	if err != nil {
@@ -265,7 +270,7 @@ func processMainPHPFile(workDir, mainPHPFile string, updateInfo *UpdateInfo) (st
 	var commentVersion string
 	if len(commentMatch) == 4 {
 		commentVersion = contentStr[commentMatch[2]:commentMatch[3]]
-		logAndPrint(t("log.version_comment_found", commentVersion))
+		logVerbose(t("log.version_comment_found", commentVersion))
 	}
 
 	classVersionRegex := regexp.MustCompile(`private\s+\$version\s*=\s*['"]+([0-9]+\.[0-9]+(?:\.[0-9]+)?)['"]+`)
@@ -274,7 +279,7 @@ func processMainPHPFile(workDir, mainPHPFile string, updateInfo *UpdateInfo) (st
 	var classVersion string
 	if len(classMatch) == 4 {
 		classVersion = contentStr[classMatch[2]:classMatch[3]]
-		logAndPrint(t("log.version_class_found", classVersion))
+		logVerbose(t("log.version_class_found", classVersion))
 	}
 
 	defineVersionRegex := regexp.MustCompile(`define\s*\(\s*['"]([A-Z_]+)_VERSION['"]\s*,\s*['"]([0-9]+\.[0-9]+(?:\.[0-9]+)?)['"]\s*\)`)
@@ -285,7 +290,7 @@ func processMainPHPFile(workDir, mainPHPFile string, updateInfo *UpdateInfo) (st
 	if len(defineMatch) >= 6 {
 		defineKey = contentStr[defineMatch[2]:defineMatch[3]]
 		defineVersion = contentStr[defineMatch[4]:defineMatch[5]]
-		logAndPrint(t("log.version_define_found", defineKey+"_VERSION", defineVersion))
+		logVerbose(t("log.version_define_found", defineKey+"_VERSION", defineVersion))
 	}
 
 	currentVersion := getHigherVersion(commentVersion, classVersion)
@@ -293,21 +298,21 @@ func processMainPHPFile(workDir, mainPHPFile string, updateInfo *UpdateInfo) (st
 	if currentVersion == "" {
 		return "", fmt.Errorf("%s", t("error.no_valid_version"))
 	}
-	logAndPrint(t("log.update_info_version_updated", currentVersion))
+	logVerbose(t("log.update_info_version_updated", currentVersion))
 
 	if classVersion != "" && classVersion != currentVersion && len(classMatch) == 4 {
 		contentStr = contentStr[:classMatch[2]] + currentVersion + contentStr[classMatch[3]:]
-		logAndPrint(t("log.version_class_updated", currentVersion))
+		logVerbose(t("log.version_class_updated", currentVersion))
 	}
 
 	if commentVersion != "" && commentVersion != currentVersion && len(commentMatch) == 4 {
 		contentStr = contentStr[:commentMatch[2]] + currentVersion + contentStr[commentMatch[3]:]
-		logAndPrint(t("log.version_comment_updated", currentVersion))
+		logVerbose(t("log.version_comment_updated", currentVersion))
 	}
 
 	if defineVersion != "" && defineVersion != currentVersion && len(defineMatch) >= 6 {
 		contentStr = contentStr[:defineMatch[4]] + currentVersion + contentStr[defineMatch[5]:]
-		logAndPrint(t("log.version_define_updated", currentVersion))
+		logVerbose(t("log.version_define_updated", currentVersion))
 	}
 
 	currentDate := time.Now().Format("2006-01-02 15:04:05")
@@ -316,7 +321,7 @@ func processMainPHPFile(workDir, mainPHPFile string, updateInfo *UpdateInfo) (st
 
 	if len(lastUpdateMatch) >= 4 {
 		contentStr = contentStr[:lastUpdateMatch[2]] + currentDate + contentStr[lastUpdateMatch[3]:]
-		logAndPrint(t("log.last_update_updated", currentDate))
+		logVerbose(t("log.last_update_updated", currentDate))
 	} else {
 		commentVersionRegex = regexp.MustCompile(`(?is)(?:/\*.*?|//\s*)(\bVersion:\s*[0-9]+\.[0-9]+(?:\.[0-9]+)?)`)
 		commentMatch := commentVersionRegex.FindStringSubmatchIndex(contentStr)
@@ -329,7 +334,7 @@ func processMainPHPFile(workDir, mainPHPFile string, updateInfo *UpdateInfo) (st
 				contentStr[posBeforeVersion:commentMatch[2]] +
 				fmt.Sprintf("Last-Update: %s", currentDate) +
 				contentStr[commentMatch[1]:]
-			logAndPrint(t("log.last_update_added", currentDate))
+			logVerbose(t("log.last_update_added", currentDate))
 		}
 	}
 
@@ -344,16 +349,16 @@ func processMainPHPFile(workDir, mainPHPFile string, updateInfo *UpdateInfo) (st
 	oldSlug := ""
 	if pucMatch[2] > 0 && (pucMatch[3] > pucMatch[2]) {
 		oldDownloadURL = contentStr[pucMatch[2]:pucMatch[3]]
-		logAndPrint(t("log.puc_download_url", redactSensitiveURL(oldDownloadURL)))
+		logVerbose(t("log.puc_download_url", redactSensitiveURL(oldDownloadURL)))
 	} else {
 		return "", fmt.Errorf("%s", t("error.no_valid_puc", phpFilePath))
 	}
 	if pucMatch[4] > 0 && (pucMatch[5] > pucMatch[4]) {
-		logAndPrint(t("log.puc_comment", contentStr[pucMatch[4]:pucMatch[5]]))
+		logVerbose(t("log.puc_comment", contentStr[pucMatch[4]:pucMatch[5]]))
 	}
 	if pucMatch[6] > 0 && (pucMatch[7] > pucMatch[6]) {
 		oldSlug = contentStr[pucMatch[6]:pucMatch[7]]
-		logAndPrint(t("log.puc_slug", oldSlug))
+		logVerbose(t("log.puc_slug", oldSlug))
 	}
 
 	needUpdate := false
@@ -370,7 +375,7 @@ func processMainPHPFile(workDir, mainPHPFile string, updateInfo *UpdateInfo) (st
 		needUpdate = true
 	}
 	if needUpdate {
-		logAndPrint(t("log.puc_changed", contentStr[pucMatch[0]:(pucMatch[1]+lengthdiff)]))
+		logVerbose(t("log.puc_changed", contentStr[pucMatch[0]:(pucMatch[1]+lengthdiff)]))
 	}
 
 	if err := os.Rename(phpFilePath, phpFilePath+".bak"); err != nil {
@@ -380,7 +385,7 @@ func processMainPHPFile(workDir, mainPHPFile string, updateInfo *UpdateInfo) (st
 		return "", fmt.Errorf(t("error.write_php"), err)
 	}
 
-	logAndPrint(t("log.php_updated"))
+	logVerbose(t("log.php_updated"))
 	return currentVersion, nil
 }
 

@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.5.0.77] - 2026-06-23 21:05:28
+
+- Feature: `-v` / `-verbose` enables detailed output (system commands, opened
+  files, ZIP file list, SSH communication, SVG/Git progress).
+
 ## [1.4.0.73] - 2026-06-23 20:14:37
 
 - Fix: Exit with error when GitHub commit/tag/push fails instead of printing

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"html"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -190,13 +189,9 @@ func getChangedFiles(workDir string) ([]string, error) {
 		return []string{}, nil
 	}
 
-	cmd := exec.Command("git", "describe", "--tags", "--abbrev=0")
-	cmd.Dir = workDir
-	_, err := cmd.Output()
+	_, err := runGitCommandOutput(workDir, "describe", "--tags", "--abbrev=0")
 	if true || err != nil {
-		cmd = exec.Command("git", "diff", "--name-only", "HEAD")
-		cmd.Dir = workDir
-		output, err := cmd.Output()
+		output, err := runGitCommandOutput(workDir, "diff", "--name-only", "HEAD")
 		if err != nil {
 			return []string{}, nil
 		}
@@ -245,7 +240,7 @@ func promptChangelogText(version string, existingText string, changedFiles []str
 
 	if os.Getenv("SKIP_CHANGELOG_INPUT") != "" || os.Getenv("AUTO_CHANGELOG") != "" {
 		if preview.Len() > 0 {
-			logAndPrint("Using auto-generated changelog (SKIP_CHANGELOG_INPUT or AUTO_CHANGELOG is set)")
+			logVerbose("Using auto-generated changelog (SKIP_CHANGELOG_INPUT or AUTO_CHANGELOG is set)")
 			return strings.TrimSpace(preview.String()), nil
 		}
 		return "", nil
@@ -253,10 +248,10 @@ func promptChangelogText(version string, existingText string, changedFiles []str
 
 	if !isInteractiveTerminal() {
 		if preview.Len() > 0 {
-			logAndPrint("Non-interactive terminal detected, using auto-generated changelog")
+			logVerbose("Non-interactive terminal detected, using auto-generated changelog")
 			return strings.TrimSpace(preview.String()), nil
 		}
-		logAndPrint("Non-interactive terminal detected and no preview available, skipping changelog input")
+		logVerbose("Non-interactive terminal detected and no preview available, skipping changelog input")
 		return "", nil
 	}
 
@@ -265,7 +260,7 @@ func promptChangelogText(version string, existingText string, changedFiles []str
 	input, err := reader.ReadString('\n')
 	if err != nil {
 		if preview.Len() > 0 {
-			logAndPrint("Error reading input, using auto-generated changelog")
+			logVerbose("Error reading input, using auto-generated changelog")
 			return strings.TrimSpace(preview.String()), nil
 		}
 		return "", err
@@ -280,7 +275,7 @@ func promptChangelogText(version string, existingText string, changedFiles []str
 }
 
 func processChangelog(workDir string, version string, textOverride string) (string, error) {
-	logAndPrint(t("log.changelog_reading", version))
+	logVerbose(t("log.changelog_reading", version))
 
 	existingText, err := readChangelog(workDir, version)
 	if err != nil {
@@ -292,7 +287,7 @@ func processChangelog(workDir string, version string, textOverride string) (stri
 		logAndPrint(t("error.changed_files", err))
 		changedFiles = []string{}
 	} else {
-		logAndPrint(t("log.changed_files_detected", len(changedFiles)))
+		logVerbose(t("log.changed_files_detected", len(changedFiles)))
 	}
 
 	changelogText, err := promptChangelogText(version, existingText, changedFiles, textOverride)
@@ -303,12 +298,12 @@ func processChangelog(workDir string, version string, textOverride string) (stri
 		return "", nil
 	}
 
-	logAndPrint(t("log.changelog_writing", version))
+	logVerbose(t("log.changelog_writing", version))
 	err = writeChangelog(workDir, version, changelogText)
 	if err != nil {
 		return "", err
 	}
-	logAndPrint(t("log.changelog_updated"))
+	logVerbose(t("log.changelog_updated"))
 
 	return changelogText, nil
 }
@@ -442,5 +437,5 @@ func updateChangelogInUpdateInfo(workDir string, updateInfo *UpdateInfo, changel
 	}
 
 	updateInfo.Sections["changelog"] = htmlText
-	logAndPrint(t("log.changelog_in_update_info"))
+	logVerbose(t("log.changelog_in_update_info"))
 }

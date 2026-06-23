@@ -183,12 +183,11 @@ func convertSingleSVGHeight1024WithImageMagick(svgPath string, outputDir string)
 	}
 
 	// Height-only resize: keep aspect ratio, auto width.
-	cmd := exec.Command(*execPath, "-background", "transparent", "-resize", "x1024", svgPath, outputPath)
-	if err := cmd.Run(); err != nil {
+	if err := runSystemCommand("", *execPath, "-background", "transparent", "-resize", "x1024", svgPath, outputPath); err != nil {
 		return fmt.Errorf("failed to convert %s: %v", svgPath, err)
 	}
 
-	logAndPrint(fmt.Sprintf("Converted: %s -> %s", filepath.Base(svgPath), filepath.Base(outputPath)))
+	logVerbose(fmt.Sprintf("Converted: %s -> %s", filepath.Base(svgPath), filepath.Base(outputPath)))
 	return nil
 }
 
@@ -204,12 +203,11 @@ func convertSingleSVGHeight1024WithInkscape(svgPath string, outputDir string) er
 	}
 
 	// Specify only height to preserve aspect ratio.
-	cmd := exec.Command(*execPath, "--export-filename", outputPath, "--export-height", "1024", svgPath)
-	if err := cmd.Run(); err != nil {
+	if err := runSystemCommand("", *execPath, "--export-filename", outputPath, "--export-height", "1024", svgPath); err != nil {
 		return fmt.Errorf("failed to convert %s: %v", svgPath, err)
 	}
 
-	logAndPrint(fmt.Sprintf("Converted: %s -> %s", filepath.Base(svgPath), filepath.Base(outputPath)))
+	logVerbose(fmt.Sprintf("Converted: %s -> %s", filepath.Base(svgPath), filepath.Base(outputPath)))
 	return nil
 }
 
@@ -235,12 +233,11 @@ func convertSingleSVGWithImageMagick(svgPath string, outputDir string, squareSiz
 		return fmt.Errorf("magick executable not found")
 	}
 
-	cmd := exec.Command(*execPath, "-background", "transparent", "-resize", resizeArg, svgPath, outputPath)
-	if err := cmd.Run(); err != nil {
+	if err := runSystemCommand("", *execPath, "-background", "transparent", "-resize", resizeArg, svgPath, outputPath); err != nil {
 		return fmt.Errorf("failed to convert %s: %v", svgPath, err)
 	}
 
-	logAndPrint(fmt.Sprintf("Converted: %s -> %s", filepath.Base(svgPath), filepath.Base(outputPath)))
+	logVerbose(fmt.Sprintf("Converted: %s -> %s", filepath.Base(svgPath), filepath.Base(outputPath)))
 	return nil
 }
 
@@ -268,12 +265,11 @@ func convertSingleSVGWithInkscape(svgPath string, outputDir string, squareSize [
 		return fmt.Errorf("inkscape executable not found")
 	}
 
-	cmd := exec.Command(*execPath, "--export-filename", outputPath, "--export-width", width, "--export-height", height, svgPath)
-	if err := cmd.Run(); err != nil {
+	if err := runSystemCommand("", *execPath, "--export-filename", outputPath, "--export-width", width, "--export-height", height, svgPath); err != nil {
 		return fmt.Errorf("failed to convert %s: %v", svgPath, err)
 	}
 
-	logAndPrint(fmt.Sprintf("Converted: %s -> %s", filepath.Base(svgPath), filepath.Base(outputPath)))
+	logVerbose(fmt.Sprintf("Converted: %s -> %s", filepath.Base(svgPath), filepath.Base(outputPath)))
 	return nil
 }
 
@@ -389,7 +385,7 @@ func processSVGFiles(workDir string) error {
 		allSVGFiles = filterExistingSVGsInUpdates(updatesDir, allSVGFiles)
 		svgFilesToConvert = findSVGsWithMissingOrStalePNGs(updatesDir, allSVGFiles)
 		if len(svgFilesToConvert) > 0 {
-			logAndPrint("SVGs changed: none detected; forcing conversion because PNGs are missing or stale")
+			logVerbose("SVGs changed: none detected; forcing conversion because PNGs are missing or stale")
 		}
 	}
 
@@ -397,22 +393,22 @@ func processSVGFiles(workDir string) error {
 		return nil
 	}
 
-	logAndPrint(t("log.svg_converting"))
-	logAndPrint(fmt.Sprintf("Found %d SVG file(s) to convert", len(svgFilesToConvert)))
+	logVerbose(t("log.svg_converting"))
+	logVerbose(fmt.Sprintf("Found %d SVG file(s) to convert", len(svgFilesToConvert)))
 
 	for _, svgFile := range svgFilesToConvert {
-		logAndPrint(fmt.Sprintf("SVG convert candidate: %s", svgFile))
+		logVerbose(fmt.Sprintf("SVG convert candidate: %s", svgFile))
 		svgPath := filepath.Join(updatesDir, filepath.Base(svgFile))
 		svgInfo, svgErr := os.Stat(svgPath)
 		for _, p := range expectedPNGPathsForSVG(updatesDir, svgFile) {
 			pngInfo, pngErr := os.Stat(p)
 			if pngErr == nil {
 				if svgErr == nil && pngInfo.ModTime().Before(svgInfo.ModTime()) {
-					logAndPrint(fmt.Sprintf("Stale PNG target: %s", filepath.Base(p)))
+					logVerbose(fmt.Sprintf("Stale PNG target: %s", filepath.Base(p)))
 				}
 				continue
 			}
-			logAndPrint(fmt.Sprintf("Missing PNG target: %s", filepath.Base(p)))
+			logVerbose(fmt.Sprintf("Missing PNG target: %s", filepath.Base(p)))
 		}
 	}
 
@@ -420,6 +416,6 @@ func processSVGFiles(workDir string) error {
 		return err
 	}
 
-	logAndPrint(t("log.svg_converted"))
+	logVerbose(t("log.svg_converted"))
 	return nil
 }
