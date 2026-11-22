@@ -1,0 +1,13 @@
+# golangci-lint v2 (same version in CI, scripts/cicheck and makefile: v2.14.0)
+# Run: go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0 run
+version: "2"
+linters:
+  default: standard
+  exclusions:
+    # Keeps the v1 default exclusions (e.g. unchecked "defer f.Close()").
+    presets:
+      - std-error-handling
+
+formatters:
+  enable:
+    - gofmt

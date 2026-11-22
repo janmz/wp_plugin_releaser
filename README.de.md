@@ -140,7 +140,12 @@ Beispiel-Konfiguration:
 ## Sicherheitsfunktionen
 
 - **Hardwaregebundene Verschlüsselung**: Passwörter werden mit einem vom
-  System abgeleiteten Schlüssel verschlüsselt.
+  System abgeleiteten Schlüssel verschlüsselt
+  ([janmz/sconfig](https://github.com/janmz/sconfig) 3.1, Schlüsselformat v3:
+  zusätzlich an Rechnernamen und Laufwerk der Konfigurationsdatei gebunden;
+  ältere Werte werden automatisch umgewandelt). Nach dem Umbenennen des PCs
+  oder dem Verschieben der Konfigurationsdatei auf ein anderes Laufwerk die
+  Passwörter neu im Klartext eintragen.
 - **Automatische Passwortverschlüsselung**: Klartext-Passwörter werden nach
   der ersten Nutzung automatisch verschlüsselt.
 - **Sichere Dateiverarbeitung**: Vor Änderungen werden Backups erstellt.
@@ -226,7 +231,7 @@ make release
 
 ### Entwicklungsumgebung
 
-- Go 1.21+
+- Go 1.26+
 - Make (für Build-Automatisierung)
 - Git
 

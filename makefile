@@ -114,18 +114,11 @@ test-i18n:
 	@echo "Testing English localization..."
 	LANG=en_US.UTF-8 ./bin/${BINARY_NAME} --help || true
 
-# Git Pre-commit Hook installieren (Windows: pre-commit.exe, Unix: sh + go run)
+# Git Pre-commit Hook aktivieren (.githooks/pre-commit ist versioniert, sh + go run)
 .PHONY: install-hooks
 install-hooks:
 	@git config core.hooksPath .githooks
-ifeq ($(OS),Windows_NT)
-	@go build -o .githooks/pre-commit.exe ./scripts/cicheck
-	@echo Pre-commit hook installed: .githooks/pre-commit.exe
-else
-	@printf '%s\n' '#!/bin/sh' 'cd "$$(git rev-parse --show-toplevel)" || exit 1' 'exec go run ./scripts/cicheck' > .githooks/pre-commit
-	@chmod +x .githooks/pre-commit
 	@echo Pre-commit hook installed: .githooks/pre-commit
-endif
 
 # Dokumentation generieren
 .PHONY: docs
@@ -155,7 +148,7 @@ ci:
 
 lint:
 	@echo "Running linters..."
-	@go run github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.8 run --timeout=5m
+	@go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0 run --timeout=5m
 
 # Hilfe anzeigen
 .PHONY: help

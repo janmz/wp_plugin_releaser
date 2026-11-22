@@ -478,4 +478,3 @@ func redactSensitiveURL(rawURL string) string {
 	parsedURL.Fragment = ""
 	return parsedURL.String()
 }
-

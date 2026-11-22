@@ -31,3 +31,13 @@ Thumbs.db
 
 # Local release configuration (contains secrets)
 update.config
+.env
+config.json
+
+# AI instructions and security report (never commit)
+AGENTS.md
+CLAUDE.md
+.claude/
+.cursorrules
+.cursor/
+securityreport.md

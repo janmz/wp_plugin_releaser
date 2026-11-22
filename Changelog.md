@@ -1,5 +1,41 @@
 # Changelog
 
+## [1.6.4.90] - 2026-11-22 18:08:29
+
+- Fix: Pre-Commit-Hook ist jetzt das versionierte Shell-Skript
+  `.githooks/pre-commit` (`go run ./scripts/cicheck`) statt eines lokal
+  gebauten `pre-commit.exe`. Git for Windows konnte die `.exe` bei relativem
+  `core.hooksPath` nicht starten („cannot spawn … No such file or directory“),
+  und die nicht versionierte `.exe` veraltete unbemerkt.
+  `scripts/install-hooks.ps1` und `make install-hooks` setzen nur noch
+  `core.hooksPath` und entfernen eine alte `pre-commit.exe`. Neue
+  `.gitattributes` erzwingt LF für den Hook.
+
+## [1.6.4.89] - 2026-11-22 18:04:06
+
+- Fix: golangci-lint auf v2.14.0 umgestellt (`scripts/cicheck`, `makefile`,
+  CI mit `golangci-lint-action@v9`); v1.64.8 kann mit Go 1.26 keine Pakete
+  mehr laden, dadurch scheiterten `cicheck` und der Pre-Commit-Hook. Neue
+  `.golangci.yml` (v2) übernimmt die bisherigen v1-Standardausnahmen.
+- Lint: `fmt.Fprintf` statt `WriteString(fmt.Sprintf(...))` in
+  `changelog.go`; gofmt-Korrekturen in `core.go` und `wp_plugin_release.go`.
+- `.gitignore`: schließt jetzt `.env`, `config.json`, KI-Anweisungen
+  (`CLAUDE.md`, `AGENTS.md`, `.claude/`, `.cursor*`) und `securityreport.md` aus.
+
+## [1.6.4.88] - 2026-11-22 09:59:48
+
+- Update: `github.com/janmz/sconfig/v3` v3.1.1 wird jetzt regulär von GitHub
+  bezogen; `replace github.com/janmz/sconfig => ../sconfig` entfernt (der
+  lokale Ordner ist inzwischen das Modul `…/sconfig/v3`, der alte `replace`
+  ließ sich nicht mehr bauen). Verschlüsselte Passwörter werden beim nächsten
+  Start ins Schlüsselformat v3 umgewandelt und sind dann zusätzlich an
+  Rechnernamen und Laufwerk der Konfigurationsdatei gebunden; ältere
+  Programmversionen können sie nicht mehr lesen.
+- CI (`pipeline.yml`): klont nur noch `ssh-commands` für dessen `replace`;
+  Go 1.26 (durch `ssh-commands` vorgegeben, `go.mod` jetzt `go 1.26.0`,
+  `golang.org/x/crypto` v0.58.0, `golang.org/x/text` v0.43.0).
+- README (EN/DE): Go 1.26+, Hinweis auf die neue Schlüsselbindung.
+
 ## [1.6.0.79] - 2026-06-24 00:07:21
 
 - Fix: `release.yml` grants `contents: write` to the reusable pipeline so the

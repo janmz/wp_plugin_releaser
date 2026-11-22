@@ -37,7 +37,7 @@ func main() {
 	fmt.Println("Running golangci-lint...")
 	if err := run(
 		"go", "run",
-		"github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.8",
+		"github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0",
 		"run", "--timeout=5m",
 	); err != nil {
 		os.Exit(1)

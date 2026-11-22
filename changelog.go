@@ -229,7 +229,7 @@ func promptChangelogText(version string, existingText string, changedFiles []str
 	if len(changedFiles) > 0 {
 		preview.WriteString("Changed files:\n")
 		for _, file := range changedFiles {
-			preview.WriteString(fmt.Sprintf("- %s\n", file))
+			fmt.Fprintf(&preview, "- %s\n", file)
 		}
 	}
 

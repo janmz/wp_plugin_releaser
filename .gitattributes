@@ -1,0 +1,2 @@
+# Shell hooks must keep LF line endings (sh fails on CRLF).
+.githooks/pre-commit text eol=lf

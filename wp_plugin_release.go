@@ -12,13 +12,15 @@ package main
  * sconfig.go: Reading the config file with secure passwords
  * i18n.go: Internationalization of outputs and error messages
  *
- * Version: 1.6.3.86 (in version.go zu ändern)
+ * Version: 1.6.4.90 (in version.go zu ändern)
  *
  * Author: Jan Neuhaus, VAYA Consulting, https://vaya-consultig.de/development/ https://github.com/janmz
  *
  * Repository: https://github.com/janmz/wp_plugin_releaser
  *
  * ChangeLog:
+ * 22.11.26	1.6.4	Fix: Now using sconfig/v3
+ *  22.11.26	1.6.4	Update: sconfig v3.1.1 from GitHub (no local replace), key format v3
  *  24.06.26	1.6.3	Fix: missing ssh-commands on github
  *  24.06.26	1.6.2	Fix: missing ssh-commands on github
  *  24.06.26	1.6.1	Fix: ci workflow now working
@@ -63,7 +65,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/janmz/sconfig"
+	"github.com/janmz/sconfig/v3"
 )
 
 var logger *log.Logger
@@ -107,7 +109,7 @@ func parseCLIArgs(args []string) (workDir string, fetchHostKey bool, commitMessa
 }
 
 func main() {
-	
+
 	executablePath, err := os.Executable()
 	if err != nil {
 		executablePath = os.Args[0]

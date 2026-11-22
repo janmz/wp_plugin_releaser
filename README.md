@@ -139,6 +139,9 @@ Example config:
 ## Security Features
 
 - **Hardware-bound encryption**: Passwords are encrypted with a key derived from your system's hardware
+  ([janmz/sconfig](https://github.com/janmz/sconfig) 3.1, key format v3: also bound to the computer
+  name and the drive that holds the config file; older values are converted automatically). After
+  renaming the PC or moving the config file to another drive, enter the passwords again in plain text.
 - **Automatic password encryption**: Plain text passwords are automatically encrypted after first use
 - **Secure file handling**: Backup files are created before modifications
 - **SSH key authentication**: Supports both key and password authentication
@@ -223,7 +226,7 @@ make release
 
 ### Development Environment
 
-- Go 1.21+
+- Go 1.26+
 - Make (for build automation)
 - Git
 

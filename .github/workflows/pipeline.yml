@@ -10,7 +10,7 @@ on:
         default: false
 
 env:
-  GO_VERSION: '1.25'
+  GO_VERSION: '1.26'
   GOTOOLCHAIN: auto
 
 jobs:
@@ -27,10 +27,9 @@ jobs:
         go-version: ${{ env.GO_VERSION }}
         cache: true
 
-    - name: Checkout sconfig (replace dependency)
+    - name: Checkout ssh-commands (replace dependency)
       run: |
         cd "$GITHUB_WORKSPACE/.."
-        git clone --depth 1 "https://x-access-token:${TOKEN}@github.com/janmz/sconfig.git"
         git clone --depth 1 "https://x-access-token:${TOKEN}@github.com/janmz/ssh-commands.git"
       env:
         TOKEN: ${{ secrets.REPO_ACCESS_TOKEN || secrets.GITHUB_TOKEN }}
@@ -59,9 +58,9 @@ jobs:
         name: codecov-umbrella
 
     - name: Run golangci-lint
-      uses: golangci/golangci-lint-action@v6
+      uses: golangci/golangci-lint-action@v9
       with:
-        version: v1.64.8
+        version: v2.14.0
         install-mode: goinstall
         args: --timeout=5m
 
@@ -105,10 +104,9 @@ jobs:
       with:
         fetch-depth: 0
 
-    - name: Checkout sconfig (replace dependency)
+    - name: Checkout ssh-commands (replace dependency)
       run: |
         cd "$GITHUB_WORKSPACE/.."
-        git clone --depth 1 "https://x-access-token:${TOKEN}@github.com/janmz/sconfig.git"
         git clone --depth 1 "https://x-access-token:${TOKEN}@github.com/janmz/ssh-commands.git"
       env:
         TOKEN: ${{ secrets.REPO_ACCESS_TOKEN || secrets.GITHUB_TOKEN }}
