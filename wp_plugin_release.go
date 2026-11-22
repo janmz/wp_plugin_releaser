@@ -20,6 +20,7 @@ package main
  *
  * ChangeLog:
  * 22.11.26	1.6.4	Fix: Now using sconfig/v3
+ * 22.11.26	1.6.4	Fix: Now using sconfig/v3
  *  22.11.26	1.6.4	Update: sconfig v3.1.1 from GitHub (no local replace), key format v3
  *  24.06.26	1.6.3	Fix: missing ssh-commands on github
  *  24.06.26	1.6.2	Fix: missing ssh-commands on github
