@@ -20,6 +20,7 @@ package main
  *
  * ChangeLog:
  * 24.11.26	1.7.0	Feature: Inserted deprication notice and creation of missing update.config values or even missing file
+ * 24.11.26	1.7.0	Feature: Inserted deprication notice and creation of missing update.config values or even missing file
  * 24.11.26	1.7.0	Feature: notice to use releaseBuild.exe, update.config is created or completed (type, version, main_php_file)
  * 22.11.26	1.6.4	Fix: Now using sconfig/v3
  * 22.11.26	1.6.4	Fix: Now using sconfig/v3
