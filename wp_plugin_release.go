@@ -20,18 +20,14 @@ package main
  *
  * ChangeLog:
  * 24.11.26	1.7.0	Feature: Inserted deprication notice and creation of missing update.config values or even missing file
- * 24.11.26	1.7.0	Feature: Inserted deprication notice and creation of missing update.config values or even missing file
- * 24.11.26	1.7.0	Feature: notice to use releaseBuild.exe, update.config is created or completed (type, version, main_php_file)
- * 22.11.26	1.6.4	Fix: Now using sconfig/v3
- * 22.11.26	1.6.4	Fix: Now using sconfig/v3
+ *  24.11.26	1.7.0	Feature: notice to use releaseBuild.exe, update.config is created or completed (type, version, main_php_file)
+ *  22.11.26	1.6.4	Fix: Now using sconfig/v3
  *  22.11.26	1.6.4	Update: sconfig v3.1.1 from GitHub (no local replace), key format v3
  *  24.06.26	1.6.3	Fix: missing ssh-commands on github
  *  24.06.26	1.6.2	Fix: missing ssh-commands on github
  *  24.06.26	1.6.1	Fix: ci workflow now working
  *  23.06.26	1.6.0	Fix: New -v or -verbose flag
- *  23.06.26	1.4.1	Fix: Really stop if github commit stops due to precommit task
  *  23.06.26	1.5.1	Fix: Really stop if github commit stops due to precommit task
- *  23.06.26	1.5.0	Fix: Really stop if github commit stops due to precommit task
  *  23.06.26	1.4.0	Fix: better github workflows and using janmz/ssh-commands
  *  22.06.26	1.3.2	Fix: include a pre commit hook to prevent ci-workflow failures
  *  28.04.26	1.3.1	Fix: existing version information not removed, but extended

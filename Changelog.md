@@ -4,6 +4,7 @@
 
 - Feature: Inserted deprication notice and creation of missing update.config values or even missing file
 - Feature: Inserted deprication notice and creation of missing update.config values or even missing file
+- Feature: Inserted deprication notice and creation of missing update.config values or even missing file
 - Feature: Beim Start erscheint der Hinweis, künftig `releaseBuild.exe`
   (https://github.com/janmz/releaseBuild) zu verwenden.
 - Feature: Fehlt `update.config`, wird sie mit allen Feldern für releaseBuild
