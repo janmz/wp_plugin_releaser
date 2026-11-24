@@ -6,7 +6,10 @@
   "app.release_process_completed": "Release process completed successfully",
   
   "error.no_directory": "Directory %s does not exist or is not readable",
-  "error.no_config": "Directory %s does not contain update.config file",
+  "notice.use_releasebuild": "NOTICE: wp_plugin_release is no longer developed. Please use releaseBuild.exe from now on (https://github.com/janmz/releaseBuild) – it reads the same update.config.",
+  "notice.config_created": "update.config was missing and has been created: %s\nPlease fill in main_php_file and the SSH fields (ssh_host, ssh_user, ssh_dir_base, ssh_password or ssh_key_file), then run releaseBuild.exe.",
+  "notice.config_fields_added": "Fields missing for releaseBuild (%s) were added to %s.",
+  "error.config_prepare": "Error creating/completing update.config: %v",
   "error.config_read": "Error reading configuration: %v",
   "error.update_info_read": "Error reading update info: %v", 
   "error.php_processing": "Error processing PHP file: %v",

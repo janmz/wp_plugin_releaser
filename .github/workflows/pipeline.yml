@@ -1,13 +1,12 @@
-# Wiederverwendbare Pipeline: Tests, Build und optional GitHub Release.
+# Wiederverwendbare Pipeline: Tests und Build (nur Leserechte).
+# Das GitHub Release erstellt release.yml in einem eigenen Job.
 name: Pipeline
 
 on:
   workflow_call:
-    inputs:
-      create_release:
-        description: 'GitHub Release mit Build-Artefakten erstellen'
-        type: boolean
-        default: false
+
+permissions:
+  contents: read
 
 env:
   GO_VERSION: '1.26'
@@ -183,30 +182,6 @@ jobs:
       with:
         name: wp_plugin_release-${{ matrix.goos }}-${{ matrix.goarch }}
         path: dist/wp_plugin_release-${{ steps.version.outputs.version }}-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.goos == 'windows' && '.zip' || '.tar.gz' }}
-
-  release:
-    if: inputs.create_release
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Download all artifacts
-      uses: actions/download-artifact@v4
-      with:
-        path: artifacts
-
-    - name: Create release
-      uses: softprops/action-gh-release@v2
-      with:
-        draft: false
-        prerelease: ${{ contains(github.ref, '-') }}
-        generate_release_notes: true
-        files: artifacts/*/*
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   security:
     runs-on: ubuntu-latest

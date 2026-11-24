@@ -12,13 +12,15 @@ package main
  * sconfig.go: Reading the config file with secure passwords
  * i18n.go: Internationalization of outputs and error messages
  *
- * Version: 1.6.4.90 (in version.go zu ändern)
+ * Version: 1.7.0.91 (in version.go zu ändern)
  *
  * Author: Jan Neuhaus, VAYA Consulting, https://vaya-consultig.de/development/ https://github.com/janmz
  *
  * Repository: https://github.com/janmz/wp_plugin_releaser
  *
  * ChangeLog:
+ * 24.11.26	1.7.0	Feature: Inserted deprication notice and creation of missing update.config values or even missing file
+ * 24.11.26	1.7.0	Feature: notice to use releaseBuild.exe, update.config is created or completed (type, version, main_php_file)
  * 22.11.26	1.6.4	Fix: Now using sconfig/v3
  * 22.11.26	1.6.4	Fix: Now using sconfig/v3
  *  22.11.26	1.6.4	Update: sconfig v3.1.1 from GitHub (no local replace), key format v3
@@ -142,10 +144,20 @@ func main() {
 		os.Exit(1)
 	}
 
+	fmt.Println(t("notice.use_releasebuild"))
+
 	updateConfigPath := filepath.Join(workDir, "update.config")
-	if _, err := os.Stat(updateConfigPath); os.IsNotExist(err) {
-		fmt.Printf("%s", t("error.no_config", workDir)+"\n")
+	created, added, err := ensureReleaseBuildConfig(workDir)
+	if err != nil {
+		fmt.Println(t("error.config_prepare", err))
 		os.Exit(1)
+	}
+	if created {
+		fmt.Println(t("notice.config_created", updateConfigPath))
+		os.Exit(1)
+	}
+	if len(added) > 0 {
+		fmt.Println(t("notice.config_fields_added", strings.Join(added, ", "), updateConfigPath))
 	}
 
 	initLogging(workDir)

@@ -18,6 +18,7 @@ import (
 // ConfigType structure for update.config
 type ConfigType struct {
 	Version           int      `json:"version" default:"0"`
+	Type              string   `json:"type"` // releaseBuild project type ("wordpress")
 	MainPHPFile       string   `json:"main_php_file"`
 	SkipPattern       []string `json:"skip_pattern"`
 	SSHHost           string   `json:"ssh_host"`

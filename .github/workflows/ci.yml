@@ -7,6 +7,9 @@ on:
   pull_request:
     branches: [ main ]
 
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -40,6 +43,4 @@ jobs:
         (needs.skip-tagged-main.result == 'success' && needs.skip-tagged-main.outputs.should_run == 'true')
       )
     uses: ./.github/workflows/pipeline.yml
-    with:
-      create_release: false
     secrets: inherit

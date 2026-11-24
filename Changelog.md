@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.7.0.91] - 2026-11-24 10:03:25
+
+- Feature: Inserted deprication notice and creation of missing update.config values or even missing file
+- Feature: Beim Start erscheint der Hinweis, künftig `releaseBuild.exe`
+  (https://github.com/janmz/releaseBuild) zu verwenden.
+- Feature: Fehlt `update.config`, wird sie mit allen Feldern für releaseBuild
+  angelegt (`version: 2`, `type: "wordpress"`, `main_php_file` – erkannt am
+  Header `Plugin Name:` –, `skip_pattern`, leere SSH-Felder); danach endet das
+  Programm mit der Bitte, SSH-Daten einzutragen. Fehlen in einer vorhandenen
+  `update.config` die Felder `type`, `version` oder `main_php_file`, werden sie
+  eingefügt; übrige Inhalte und Formatierung bleiben erhalten.
+  `ConfigType` kennt jetzt `type`, damit sconfig das Feld beim Versiegeln von
+  Passwörtern nicht verwirft.
+- Fix CI: `ci.yml` scheiterte mit „nested job 'release' is requesting
+  'contents: write', but is only allowed 'contents: read'“. Der Release-Job
+  liegt jetzt in `release.yml` (einzige Stelle mit `contents: write`);
+  `pipeline.yml` und `ci.yml` setzen `permissions: contents: read`, der
+  Eingang `create_release` entfällt.
+
 ## [1.6.4.90] - 2026-11-22 18:08:29
 
 - Fix: Pre-Commit-Hook ist jetzt das versionierte Shell-Skript
